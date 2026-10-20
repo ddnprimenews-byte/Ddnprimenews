@@ -1,0 +1,236 @@
+{
+  "entities": {
+    "Article": {
+      "title": "Article",
+      "description": "A published or draft news article on DDN Prime News portal",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique article document identifier"
+        },
+        "slug": {
+          "type": "string",
+          "description": "SEO friendly URL slug"
+        },
+        "title": {
+          "type": "string",
+          "description": "Article headline",
+          "maxLength": 300
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Lead subheadline"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief executive summary",
+          "maxLength": 1000
+        },
+        "aeoSummary": {
+          "type": "string",
+          "description": "AEO direct question answer"
+        },
+        "content": {
+          "type": "string",
+          "description": "Serialized or primary text content"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["all", "bihar", "national", "politics", "crime", "education-health", "sports", "team"]
+        },
+        "categoryHindi": {
+          "type": "string",
+          "description": "Hindi category name"
+        },
+        "location": {
+          "type": "string",
+          "description": "Reporting location (e.g. Darbhanga, Patna)"
+        },
+        "author": {
+          "type": "string",
+          "description": "Author or reporter name"
+        },
+        "authorRole": {
+          "type": "string",
+          "description": "Editorial role"
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "Formatted publication display date"
+        },
+        "datePublished": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dateModified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "readTime": {
+          "type": "string",
+          "description": "Estimated read duration"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Featured photo URL"
+        },
+        "imageCaption": {
+          "type": "string",
+          "description": "Photo caption & press credit"
+        },
+        "isLead": {
+          "type": "boolean"
+        },
+        "isBreaking": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["published", "draft"]
+        },
+        "views": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "string",
+          "description": "Comma separated keywords"
+        }
+      },
+      "required": ["title", "summary", "category", "status"]
+    },
+    "ReporterApplication": {
+      "title": "ReporterApplication",
+      "description": "District or block reporter candidate application record",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Registration ID format DDN-REP-YYYY-XXXXX"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "fatherName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "mobile": {
+          "type": "string",
+          "maxLength": 15
+        },
+        "whatsapp": {
+          "type": "string",
+          "maxLength": 15
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "district": {
+          "type": "string"
+        },
+        "block": {
+          "type": "string"
+        },
+        "panchayat": {
+          "type": "string"
+        },
+        "qualification": {
+          "type": "string"
+        },
+        "experience": {
+          "type": "string"
+        },
+        "beatPreference": {
+          "type": "string"
+        },
+        "photoUrl": {
+          "type": "string"
+        },
+        "appliedDate": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "verified", "card_generated"]
+        }
+      },
+      "required": ["fullName", "mobile", "district"]
+    },
+    "BreakingNews": {
+      "title": "BreakingNews",
+      "description": "Live breaking news alert item displayed in ticker",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": ["text"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role-based access for editors and reporters",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "editor", "reporter", "reader"]
+        },
+        "district": {
+          "type": "string"
+        }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/articles/{articleId}": {
+      "schema": {
+        "$ref": "#/entities/Article"
+      },
+      "description": "Published and draft news articles collection"
+    },
+    "/reporters/{reporterId}": {
+      "schema": {
+        "$ref": "#/entities/ReporterApplication"
+      },
+      "description": "Submissions for press card & reporter recruitment"
+    },
+    "/breaking_news/{breakingId}": {
+      "schema": {
+        "$ref": "#/entities/BreakingNews"
+      },
+      "description": "Live breaking alerts ticker feed"
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "User profiles and role access"
+    }
+  }
+}

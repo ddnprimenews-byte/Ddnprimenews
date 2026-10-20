@@ -1,0 +1,6 @@
+{
+  "name": "DDN Prime News | दरभंगा डिजिटल नेटवर्क",
+  "description": "सच्ची, निर्भीक और निष्पक्ष पत्रकारिता - दरभंगा डिजिटल नेटवर्क की आधिकारिक डिजिटल मीडिया इकाई (MSME Registered)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

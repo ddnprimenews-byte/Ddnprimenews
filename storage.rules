@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email != null && request.auth.token.email == 'ddnprimenews@gmail.com')
+      );
+    }
+
+    // Public news images & reporter profile photos (max 3MB, images only)
+    match /reporters/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 3 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Private identity documents (Aadhaar, Voter ID, Certificates)
+    // Strictly restricted: ONLY authorized administrators/editors may view identity proof!
+    match /reporter_documents/{fileName} {
+      allow read: if isAdmin();
+      allow write: if request.resource.size < 5 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    // Article featured images
+    match /articles/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

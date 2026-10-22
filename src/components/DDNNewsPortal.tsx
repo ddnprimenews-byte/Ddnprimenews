@@ -33,7 +33,8 @@ import { newsletterSchema, NewsletterInput } from '../lib/validations';
 
 import { 
   CloudSun, Newspaper, ShieldCheck, Mail, CheckCircle2, 
-  Play, Radio, UserPlus, Phone, Flame, ArrowRight, TrendingUp 
+  Play, Radio, UserPlus, Phone, Flame, ArrowRight, TrendingUp,
+  LayoutGrid, Smartphone, Sparkles, Volume2, Share2 
 } from 'lucide-react';
 
 export interface DDNNewsPortalProps {
@@ -66,6 +67,9 @@ export default function App({
     }
     return 'normal';
   });
+
+  // View format: standard desktop grid vs mobile shorts/reels view
+  const [readerMode, setReaderMode] = useState<'grid' | 'shorts'>('grid');
 
   // Navigation State
   const [activeView, setActiveView] = useState<'home' | 'article' | 'legal'>(initialView);
@@ -483,7 +487,11 @@ export default function App({
                           ? 'राजनीति व चुनाव'
                           : activeCategory === 'crime'
                           ? 'अपराध व कानून व्यवस्था'
-                          : 'खेल जगत'}
+                          : activeCategory === 'sports'
+                          ? 'खेल जगत'
+                          : activeCategory === 'entertainment'
+                          ? 'मनोरंजन एवं सिनेमा'
+                          : 'विशेष समाचार'}
                       </h2>
                       <button
                         onClick={() => handleSelectCategory('all')}
@@ -519,7 +527,7 @@ export default function App({
                     />
                   )}
 
-                  {/* News Articles Grid */}
+                  {/* News Articles Grid & View Switcher */}
                   <div>
                     <div className="flex items-center justify-between pb-2 mb-4 border-b border-stone-200">
                       <h3 className="text-lg font-bold font-serif text-stone-900 flex items-center gap-2">
@@ -530,9 +538,39 @@ export default function App({
                           ? 'प्रमुख खबरें (Top Stories)'
                           : 'श्रेणी समाचार'}
                       </h3>
-                      <span className="text-xs text-stone-500 font-mono">
-                        कुल: {filteredArticles.length}
-                      </span>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="inline-flex rounded-lg border border-stone-300 bg-stone-100 p-0.5 text-xs font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setReaderMode('grid')}
+                            className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+                              readerMode === 'grid'
+                                ? 'bg-white text-red-700 shadow-xs'
+                                : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                            title="विस्तृत डेस्कटॉप ग्रिड"
+                          >
+                            <LayoutGrid className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">ग्रिड व्यू</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReaderMode('shorts')}
+                            className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+                              readerMode === 'shorts'
+                                ? 'bg-red-700 text-white shadow-xs'
+                                : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                            title="मोबाइल रील्स व शॉर्ट्स कार्ड्स"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>शॉर्ट्स / रील्स</span>
+                          </button>
+                        </div>
+                        <span className="text-xs text-stone-500 font-mono hidden md:inline">
+                          कुल: {filteredArticles.length}
+                        </span>
+                      </div>
                     </div>
 
                     {filteredArticles.length === 0 ? (
@@ -542,7 +580,7 @@ export default function App({
                           कृपया दूसरा खोज शब्द दर्ज करें अथवा 'सभी खबरें' श्रेणी चुनें।
                         </p>
                       </div>
-                    ) : (
+                    ) : readerMode === 'grid' ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         {regularArticles.map((art) => (
                           <NewsCard
@@ -553,7 +591,165 @@ export default function App({
                           />
                         ))}
                       </div>
+                    ) : (
+                      /* Mobile Short-form / Reels View */
+                      <div className="space-y-5">
+                        {regularArticles.map((art) => (
+                          <article
+                            key={art.id}
+                            className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-md transition"
+                          >
+                            <div className="relative aspect-video w-full bg-stone-900 overflow-hidden">
+                              <img
+                                src={art.imageUrl}
+                                alt={art.title}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                                <span className="bg-red-700 text-white text-[11px] font-bold px-2 py-0.5 rounded shadow">
+                                  {art.categoryHindi}
+                                </span>
+                                <span className="bg-black/70 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded font-mono">
+                                  {art.location}
+                                </span>
+                              </div>
+                              <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-xs text-amber-300 text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-400" />
+                                <span>30s क्विक रीड</span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 sm:p-5 space-y-3">
+                              <h3 
+                                onClick={() => handleSelectArticle(art)}
+                                className="text-base sm:text-lg font-bold font-serif text-stone-900 hover:text-red-700 transition cursor-pointer leading-snug"
+                              >
+                                {art.title}
+                              </h3>
+
+                              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed bg-stone-50 p-3 rounded-lg border border-stone-100">
+                                {art.summary}
+                              </p>
+
+                              {art.aeoSummary && (
+                                <div className="text-xs text-stone-700 flex items-start gap-1.5">
+                                  <span className="font-bold text-red-700 shrink-0">निष्कर्ष:</span>
+                                  <span className="line-clamp-2">{art.aeoSummary}</span>
+                                </div>
+                              )}
+
+                              <div className="pt-2 border-t border-stone-100 flex items-center justify-between flex-wrap gap-2 text-xs">
+                                <span className="text-stone-500 font-mono text-[11px]">
+                                  {art.publishedAt} · {art.author}
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleListenArticle(art)}
+                                    className="p-1.5 rounded-lg border border-stone-200 text-stone-600 hover:text-red-700 hover:bg-stone-50 transition flex items-center gap-1 cursor-pointer"
+                                    title="ऑडियो सुनें"
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline text-[11px]">सुनें</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const text = encodeURIComponent(`*${art.title}*\n\nडीडीएन प्राइम न्यूज पर पढ़ें:\n${typeof window !== 'undefined' ? window.location.origin : ''}/news/${art.slug}`);
+                                      if (typeof window !== 'undefined') {
+                                        window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg border border-stone-200 text-emerald-700 hover:bg-emerald-50 transition flex items-center gap-1 cursor-pointer"
+                                    title="व्हाट्सएप शेयर"
+                                  >
+                                    <Share2 className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline text-[11px]">शेयर</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleSelectArticle(art)}
+                                    className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white font-bold transition flex items-center gap-1 text-[11px] cursor-pointer"
+                                  >
+                                    <span>पूरी खबर</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     )}
+                  </div>
+
+                  {/* 16:9 Video Bulletin Section */}
+                  <div className="bg-stone-950 text-white rounded-lg p-5 border border-stone-800 shadow-md">
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-stone-800">
+                      <div className="flex items-center gap-2">
+                        <Radio className="w-5 h-5 text-red-500 animate-pulse" />
+                        <h3 className="text-lg font-bold font-serif">16:9 प्राइम डिजिटल वीडियो बुलेटिन्स</h3>
+                      </div>
+                      <span className="text-[11px] font-mono text-red-400 bg-red-950/70 border border-red-800 px-2 py-0.5 rounded">
+                        HD LIVE STREAM
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                      <div className="md:col-span-8">
+                        <div 
+                          onClick={() => setIsVideoModalOpen(true)}
+                          className="relative aspect-video rounded-lg overflow-hidden cursor-pointer group bg-stone-900 border border-stone-800"
+                        >
+                          <img
+                            src={VIDEO_BULLETINS[0].thumbnail}
+                            alt={VIDEO_BULLETINS[0].title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-103 transition duration-500 opacity-85"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent flex flex-col justify-between p-4">
+                            <span className="self-start bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 shadow">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                              प्राइम रिपोर्टर
+                            </span>
+                            <div className="flex items-center justify-center">
+                              <div className="w-14 h-14 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition">
+                                <Play className="w-6 h-6 ml-0.5 fill-current" />
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-yellow-400 font-mono">एंकर: {VIDEO_BULLETINS[0].anchor} · {VIDEO_BULLETINS[0].duration}</span>
+                              <h4 className="text-sm sm:text-base font-bold text-white leading-snug mt-1">
+                                {VIDEO_BULLETINS[0].title}
+                              </h4>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-4 flex flex-col gap-2.5">
+                        <span className="text-xs text-stone-400 font-semibold mb-1">अन्य प्रमुख बुलेटिन्स</span>
+                        {VIDEO_BULLETINS.slice(1, 3).map((vid) => (
+                          <div
+                            key={vid.id}
+                            onClick={() => setIsVideoModalOpen(true)}
+                            className="flex gap-2.5 p-2 bg-stone-900/80 hover:bg-stone-800 rounded-lg cursor-pointer transition border border-stone-800/80 group"
+                          >
+                            <div className="relative w-24 aspect-video rounded overflow-hidden shrink-0 bg-stone-800">
+                              <img src={vid.thumbnail} alt={vid.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <Play className="w-3.5 h-3.5 text-white fill-current" />
+                              </div>
+                            </div>
+                            <div className="min-w-0 flex flex-col justify-center">
+                              <h5 className="text-xs font-semibold text-stone-200 group-hover:text-red-400 transition line-clamp-2 leading-tight">
+                                {vid.title}
+                              </h5>
+                              <span className="text-[10px] text-stone-400 mt-1">{vid.duration}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Mid-Content AdSense Banner */}

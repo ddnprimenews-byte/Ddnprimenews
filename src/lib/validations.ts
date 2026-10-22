@@ -130,7 +130,7 @@ export const articlePublishSchema = z.object({
     .string()
     .trim()
     .min(20, { message: 'समाचार का विस्तृत विवरण कम से कम 20 अक्षरों का होना चाहिए।' }),
-  category: z.enum(['bihar', 'national', 'politics', 'crime', 'sports', 'education-health']),
+  category: z.enum(['bihar', 'national', 'politics', 'crime', 'sports', 'education-health', 'entertainment']),
   location: z.string().trim().min(2, { message: 'स्थान (जिला/शहर) आवश्यक है।' }),
   author: z.string().trim().min(2, { message: 'लेखक का नाम आवश्यक है।' }),
   authorRole: z.string().trim().default('विशेष संवाददाता'),

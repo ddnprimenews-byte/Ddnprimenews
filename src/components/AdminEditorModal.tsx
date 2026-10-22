@@ -5,7 +5,7 @@ import { Article, NewsCategory, ReporterApplication } from '../types/news';
 import { 
   X, PlusCircle, Trash2, CheckCircle2, ShieldCheck, 
   PenTool, AlertCircle, FileCheck, LogIn, LogOut, 
-  UserCheck, Users, ExternalLink, Printer 
+  UserCheck, Users, ExternalLink, Printer, Sparkles, Loader2 
 } from 'lucide-react';
 import { 
   auth, signInWithGoogle, signOutUser, 
@@ -57,6 +57,41 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   const [authorRole, setAuthorRole] = useState('मुख्य संपादक');
   const [articleStatus, setArticleStatus] = useState<'published' | 'draft'>('published');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
+  const handleAiAutoFill = async () => {
+    if (!title && !contentBody) {
+      alert('कृपया पहले शीर्षक या समाचार का कुछ अंश दर्ज करें।');
+      return;
+    }
+    setIsAiGenerating(true);
+    try {
+      const res = await fetch('/api/gemini/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          subtitle,
+          summary,
+          content: contentBody,
+        }),
+      });
+      const data = await res.json();
+      if (data.summary) {
+        setSummary(data.summary);
+      }
+      if (data.keyTakeaway) {
+        setAeoSummary(data.keyTakeaway);
+      }
+      if (data.bulletPoints && data.bulletPoints.length > 0 && !subtitle) {
+        setSubtitle(data.bulletPoints.join(' · '));
+      }
+    } catch (e) {
+      console.warn('AI assist notice:', e);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   // Monitor Firebase Auth state
   useEffect(() => {
@@ -139,7 +174,8 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
         category === 'national' ? 'देश' :
         category === 'politics' ? 'राजनीति' :
         category === 'crime' ? 'अपराध' :
-        category === 'sports' ? 'खेल' : 'शिक्षा & हेल्थ',
+        category === 'sports' ? 'खेल' :
+        category === 'entertainment' ? 'मनोरंजन एवं सिनेमा' : 'शिक्षा & हेल्थ',
       location,
       author,
       authorRole,
@@ -416,8 +452,9 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                         <option value="national">देश (National)</option>
                         <option value="politics">राजनीति (Politics)</option>
                         <option value="crime">अपराध (Crime)</option>
-                        <option value="sports">खेल (Sports)</option>
                         <option value="education-health">शिक्षा & स्वास्थ्य (Education/Health)</option>
+                        <option value="sports">खेल (Sports)</option>
+                        <option value="entertainment">मनोरंजन एवं सिनेमा (Entertainment)</option>
                       </select>
                     </div>
 
@@ -445,9 +482,30 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-stone-700 mb-1">
-                      संक्षिप्त विवरण (Executive Summary) *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-stone-700">
+                        संक्षिप्त विवरण (Executive Summary) *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAiAutoFill}
+                        disabled={isAiGenerating}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition shadow-xs disabled:opacity-50 cursor-pointer"
+                        title="शीर्षक या मुख्य सामग्री से AI सारांश और मुख्य बिंदु जनरेट करें"
+                      >
+                        {isAiGenerating ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
+                            <span>AI तैयार कर रहा है...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                            <span>✨ AI ऑटो-समरी व निष्कर्ष भरें</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <textarea
                       required
                       rows={2}

@@ -7,7 +7,8 @@ import { AdSenseBanner } from './AdSenseBanner';
 import { 
   ArrowLeft, Volume2, VolumeX, Share2, Bookmark, 
   BookmarkCheck, Printer, Clock, Eye, Check, Flame, 
-  History, Calendar, HelpCircle, ThumbsUp, Heart, ChevronRight 
+  History, Calendar, HelpCircle, ThumbsUp, Heart, ChevronRight,
+  Sparkles, Loader2
 } from 'lucide-react';
 
 interface ArticleExpressDetailProps {
@@ -32,6 +33,15 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
   const [reactions, setReactions] = useState({ satya: 64, vichar: 23, sarthak: 41 });
   const [userVoted, setUserVoted] = useState<string | null>(null);
 
+  // AI-assisted News Summarization State
+  const [aiSummaryData, setAiSummaryData] = useState<{
+    summary?: string;
+    bulletPoints?: string[];
+    keyTakeaway?: string;
+  } | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   // Today's Trending: Articles sorted by views or trendingRank (for Column B)
   const todaysTrending = React.useMemo(() => {
     return allArticles
@@ -48,6 +58,10 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
   }, [allArticles, article.id]);
 
   useEffect(() => {
+    // Reset AI summary state on article change
+    setAiSummaryData(null);
+    setAiError(null);
+
     // Check bookmark status
     const saved = localStorage.getItem(`ddn_bookmark_${article.id}`);
     setIsBookmarked(!!saved);
@@ -78,6 +92,42 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
       }
     };
   }, [article]);
+
+  const handleGenerateAiSummary = async () => {
+    if (aiSummaryData) return;
+    setIsAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/gemini/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: article.title,
+          subtitle: article.subtitle,
+          summary: article.summary,
+          content: article.content,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'AI सारांश प्राप्त करने में समस्या');
+      }
+      setAiSummaryData(data);
+    } catch (err: any) {
+      console.warn('AI summary fetch notice:', err);
+      setAiSummaryData({
+        summary: article.summary,
+        bulletPoints: [
+          article.title,
+          article.subtitle || article.summary,
+          `${article.location} से ${article.author} द्वारा सत्यापित कवरेज।`,
+        ],
+        keyTakeaway: article.aeoSummary || 'सच्ची और निष्पक्ष पत्रकारिता के अंतर्गत महत्वपूर्ण घटनाक्रम।',
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const toggleBookmark = () => {
     if (isBookmarked) {
@@ -341,13 +391,78 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
 
             {/* AEO (Answer Engine Optimization) Direct Answer Callout */}
             {article.aeoSummary && (
-              <div className="bg-amber-50/70 border-l-4 border-red-600 p-4 rounded-r-lg mb-6 text-xs sm:text-sm text-stone-800 leading-relaxed">
+              <div className="bg-amber-50/70 border-l-4 border-red-600 p-4 rounded-r-lg mb-4 text-xs sm:text-sm text-stone-800 leading-relaxed">
                 <span className="font-bold text-red-900 block mb-1 uppercase tracking-wide text-[11px]">
                   📌 त्वरित सार (Executive Overview / AEO Answer):
                 </span>
                 {article.aeoSummary}
               </div>
             )}
+
+            {/* AI-Assisted News Summarization Helper (Powered by @google/genai Gemini) */}
+            <div className="mb-6">
+              {!aiSummaryData && (
+                <button
+                  onClick={handleGenerateAiSummary}
+                  disabled={isAiLoading}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-red-800 via-stone-800 to-amber-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 border border-red-700/50 shadow-xs hover:shadow-md active:scale-98 cursor-pointer disabled:opacity-60"
+                >
+                  {isAiLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
+                      <span>डीडीएन एआई समाचार का विश्लेषण कर रहा है...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-yellow-300" />
+                      <span>✨ AI 30-सेकंड स्मार्ट सारांश देखें (AI Bullet Summary)</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {aiSummaryData && (
+                <div className="bg-gradient-to-br from-stone-900 to-stone-950 text-stone-100 p-5 rounded-xl border border-red-900/50 shadow-md space-y-3">
+                  <div className="flex items-center justify-between border-b border-stone-800 pb-2">
+                    <div className="flex items-center gap-2 text-yellow-400 text-xs font-bold">
+                      <Sparkles className="w-4 h-4 text-yellow-400" />
+                      <span>डीडीएन एआई विश्लेषक (AI Quick Insights)</span>
+                    </div>
+                    <span className="text-[10px] bg-red-950 text-red-300 px-2 py-0.5 rounded border border-red-800 font-mono">
+                      Gemini 3.8 Flash
+                    </span>
+                  </div>
+
+                  {aiSummaryData.summary && (
+                    <p className="text-xs sm:text-sm text-stone-200 leading-relaxed font-hindi">
+                      {aiSummaryData.summary}
+                    </p>
+                  )}
+
+                  {aiSummaryData.bulletPoints && aiSummaryData.bulletPoints.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
+                        प्रमुख 3 बिंदु (Key Highlights):
+                      </span>
+                      <ul className="space-y-1.5 text-xs text-stone-300">
+                        {aiSummaryData.bulletPoints.map((pt, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-yellow-400 font-bold shrink-0 mt-0.5">▸</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {aiSummaryData.keyTakeaway && (
+                    <div className="bg-red-950/40 border border-red-800/40 p-2.5 rounded text-xs text-amber-200">
+                      <strong>निष्कर्ष:</strong> {aiSummaryData.keyTakeaway}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Featured Image with defined dimensions to eliminate CLS */}
             <figure className="mb-6 rounded-lg overflow-hidden border border-stone-200 bg-stone-100">

@@ -29,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { label: 'अपराध', cat: 'crime' },
     { label: 'शिक्षा & हेल्थ', cat: 'education-health' },
     { label: 'खेल', cat: 'sports' },
+    { label: 'मनोरंजन', cat: 'entertainment' },
     { label: 'हमारी टीम', cat: 'team' },
   ];
 

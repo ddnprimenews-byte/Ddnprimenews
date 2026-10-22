@@ -99,6 +99,8 @@ export async function POST(request: NextRequest) {
           ? 'अपराध'
           : validatedData.category === 'sports'
           ? 'खेल'
+          : validatedData.category === 'entertainment'
+          ? 'मनोरंजन एवं सिनेमा'
           : 'शिक्षा & हेल्थ',
       location: validatedData.location,
       author: validatedData.author,

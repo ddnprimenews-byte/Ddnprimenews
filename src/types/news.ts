@@ -6,6 +6,7 @@ export type NewsCategory =
   | 'crime'
   | 'education-health'
   | 'sports'
+  | 'entertainment'
   | 'team'
   | 'epaper'
   | 'reporter'

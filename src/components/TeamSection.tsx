@@ -70,9 +70,12 @@ export const TeamSection: React.FC = () => {
           <div className="md:col-span-4 flex flex-col items-center text-center">
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-3 border-red-600 shadow-md bg-stone-200 mb-3">
               <img
-                src="/src/assets/images/ddn_reporter_press_1792323529821.jpg"
+                src="/images/ddn_reporter_press.jpg"
                 alt="Rajesh Kumar Sahu"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                }}
                 className="w-full h-full object-cover"
               />
             </div>

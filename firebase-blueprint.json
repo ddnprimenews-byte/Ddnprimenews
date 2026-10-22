@@ -37,7 +37,7 @@
         },
         "category": {
           "type": "string",
-          "enum": ["all", "bihar", "national", "politics", "crime", "education-health", "sports", "team"]
+          "enum": ["all", "bihar", "national", "politics", "crime", "education-health", "sports", "entertainment", "team"]
         },
         "categoryHindi": {
           "type": "string",
@@ -149,12 +149,16 @@
         "photoUrl": {
           "type": "string"
         },
+        "idDocumentUrl": {
+          "type": "string",
+          "description": "Secure Firebase Storage URL for identity document"
+        },
         "appliedDate": {
           "type": "string"
         },
         "status": {
           "type": "string",
-          "enum": ["pending", "verified", "card_generated"]
+          "enum": ["pending", "verified", "rejected", "card_generated"]
         }
       },
       "required": ["fullName", "mobile", "district"]

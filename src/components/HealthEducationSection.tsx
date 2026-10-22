@@ -101,9 +101,12 @@ export const HealthEducationSection: React.FC<HealthEducationSectionProps> = ({
             >
               <div className="w-full sm:w-36 h-28 rounded overflow-hidden bg-stone-100 shrink-0">
                 <img
-                  src={art.imageUrl}
+                  src={art.imageUrl || '/images/ddn_epaper_cover.jpg'}
                   alt={art.title}
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/ddn_epaper_cover.jpg';
+                  }}
                   className="w-full h-full object-cover group-hover:scale-103 transition"
                 />
               </div>

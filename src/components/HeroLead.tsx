@@ -71,9 +71,12 @@ export const HeroLead: React.FC<HeroLeadProps> = ({
             {/* Lead Image */}
             <div className="relative aspect-video w-full rounded-md overflow-hidden bg-stone-100 mb-4 border border-stone-200">
               <img
-                src={leadArticle.imageUrl}
+                src={leadArticle.imageUrl || '/images/ddn_hero_news.jpg'}
                 alt={leadArticle.title}
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                }}
                 className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
               />
               <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-xs text-white text-[11px] px-2 py-0.5 rounded font-mono">

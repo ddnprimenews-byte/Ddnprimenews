@@ -17,7 +17,7 @@ export const SITE_CONFIG = {
   
   locale: 'hi_IN',
   language: 'hi',
-  defaultOgImage: 'https://ddnprimenews.com/src/assets/images/ddn_hero_news_1792323529100.jpg',
+  defaultOgImage: 'https://ddnprimenews.com/images/ddn_hero_news.jpg',
   
   editorial: {
     chiefEditor: 'Rajesh Kumar Sahu (राजेश कुमार साहू)',

@@ -39,9 +39,12 @@ export const VideoModal: React.FC<VideoModalProps> = ({ bulletins, isOpen, onClo
         {/* Video Screen Area */}
         <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
           <img
-            src={activeVideo.thumbnail}
+            src={activeVideo.thumbnail || '/images/ddn_hero_news.jpg'}
             alt={activeVideo.title}
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+            }}
             className="w-full h-full object-cover opacity-80"
           />
 
@@ -111,7 +114,15 @@ export const VideoModal: React.FC<VideoModalProps> = ({ bulletins, isOpen, onClo
                 }`}
               >
                 <div className="w-16 h-12 rounded overflow-hidden bg-stone-800 shrink-0 relative">
-                  <img src={vid.thumbnail} alt={vid.title} className="w-full h-full object-cover" />
+                  <img 
+                    src={vid.thumbnail || '/images/ddn_hero_news.jpg'} 
+                    alt={vid.title} 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                    }}
+                    className="w-full h-full object-cover" 
+                  />
                   <span className="absolute bottom-0.5 right-0.5 bg-black/80 text-[9px] px-1 rounded font-mono">
                     {vid.duration}
                   </span>

@@ -277,33 +277,19 @@ export default function App({
     }
   };
 
-  // Add Article (Draft or Published)
+  // Add Article (Draft or Published) - 100% Firebase Firestore authoritatively
   const handleAddArticle = (newArt: Article) => {
-    setArticles((prev) => {
-      const updated = [newArt, ...prev];
-      const customOnes = updated.filter((a) => !INITIAL_ARTICLES.some((i) => i.id === a.id));
-      localStorage.setItem('ddn_custom_articles', JSON.stringify(customOnes));
-      return updated;
-    });
+    setArticles((prev) => [newArt, ...prev]);
   };
 
-  // Delete Article
+  // Delete Article - 100% Firebase Firestore
   const handleDeleteArticle = (id: string) => {
-    setArticles((prev) => {
-      const updated = prev.filter((a) => a.id !== id);
-      const customOnes = updated.filter((a) => !INITIAL_ARTICLES.some((i) => i.id === a.id));
-      localStorage.setItem('ddn_custom_articles', JSON.stringify(customOnes));
-      return updated;
-    });
+    setArticles((prev) => prev.filter((a) => a.id !== id));
   };
 
-  // Add Breaking News
+  // Add Breaking News - 100% Firebase Firestore
   const handleAddBreaking = (text: string) => {
-    setBreakingNews((prev) => {
-      const updated = [text, ...prev];
-      localStorage.setItem('ddn_custom_breaking', JSON.stringify([text]));
-      return updated;
-    });
+    setBreakingNews((prev) => [text, ...prev]);
   };
 
   // Global Audio Reader
@@ -604,6 +590,9 @@ export default function App({
                                 src={art.imageUrl}
                                 alt={art.title}
                                 referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                                }}
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute top-3 left-3 flex items-center gap-1.5">
@@ -704,6 +693,9 @@ export default function App({
                             src={VIDEO_BULLETINS[0].thumbnail}
                             alt={VIDEO_BULLETINS[0].title}
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                            }}
                             className="w-full h-full object-cover group-hover:scale-103 transition duration-500 opacity-85"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent flex flex-col justify-between p-4">
@@ -735,7 +727,15 @@ export default function App({
                             className="flex gap-2.5 p-2 bg-stone-900/80 hover:bg-stone-800 rounded-lg cursor-pointer transition border border-stone-800/80 group"
                           >
                             <div className="relative w-24 aspect-video rounded overflow-hidden shrink-0 bg-stone-800">
-                              <img src={vid.thumbnail} alt={vid.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                              <img 
+                                src={vid.thumbnail} 
+                                alt={vid.title} 
+                                referrerPolicy="no-referrer" 
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = '/images/ddn_bihar_heritage.jpg';
+                                }}
+                                className="w-full h-full object-cover" 
+                              />
                               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                 <Play className="w-3.5 h-3.5 text-white fill-current" />
                               </div>
@@ -910,8 +910,12 @@ export default function App({
                       className="relative aspect-video rounded overflow-hidden cursor-pointer group bg-stone-800 mb-3"
                     >
                       <img
-                        src="/src/assets/images/ddn_reporter_press_1792323529821.jpg"
+                        src="/images/ddn_reporter_press.jpg"
                         alt="Video Bulletin"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                        }}
                         className="w-full h-full object-cover group-hover:scale-103 transition duration-300 opacity-80"
                       />
                       <div className="absolute inset-0 flex items-center justify-center">

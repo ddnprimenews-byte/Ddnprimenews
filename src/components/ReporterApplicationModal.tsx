@@ -110,7 +110,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
   const onValidSubmit = async (validData: ReporterApplicationInput) => {
     setFirebaseError(null);
     const regId = `DDN-REP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-    let finalPhotoUrl = photoPreview || '/src/assets/images/ddn_reporter_press_1792323529821.jpg';
+    let finalPhotoUrl = photoPreview || '/images/ddn_reporter_press.jpg';
     let idDocUrl = '';
 
     try {
@@ -166,15 +166,6 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
         });
       } catch (apiErr) {
         console.warn('Modular API reporter sync note:', apiErr);
-      }
-
-      // Non-sensitive reference tracking in localStorage
-      try {
-        const stored = JSON.parse(localStorage.getItem('ddn_my_application_id') || '[]');
-        stored.push(regId);
-        localStorage.setItem('ddn_my_application_id', JSON.stringify(stored));
-      } catch (e) {
-        // ignore
       }
 
       setSubmittedApp(newApp);
@@ -568,7 +559,15 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                       <div className="flex flex-col items-center justify-center p-3 bg-stone-50 rounded-lg border border-stone-200">
                         {submittedApp.photoUrl && (
                           <div className="w-24 h-28 rounded overflow-hidden border border-stone-300 mb-2">
-                            <img src={submittedApp.photoUrl} alt={submittedApp.fullName} className="w-full h-full object-cover" />
+                            <img
+                              src={submittedApp.photoUrl}
+                              alt={submittedApp.fullName}
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                              }}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         )}
                         <span className="text-[10px] text-stone-400">आवेदक फोटो</span>
@@ -649,6 +648,10 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                           <img
                             src={submittedApp.photoUrl}
                             alt={submittedApp.fullName}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                            }}
                             className="w-full h-full object-cover"
                           />
                         </div>

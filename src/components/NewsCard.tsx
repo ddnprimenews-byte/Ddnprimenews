@@ -9,12 +9,28 @@ interface NewsCardProps {
 }
 
 export const NewsCard: React.FC<NewsCardProps> = ({ article, onSelect, onListen }) => {
-  const [imgError, setImgError] = React.useState(false);
+  const [imgSrc, setImgSrc] = React.useState(article.imageUrl || '/images/ddn_hero_news.jpg');
+  const [hasError, setHasError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgSrc(article.imageUrl || '/images/ddn_hero_news.jpg');
+    setHasError(false);
+  }, [article.imageUrl]);
+
+  const handleImageError = () => {
+    if (imgSrc !== '/images/ddn_hero_news.jpg') {
+      setImgSrc('/images/ddn_hero_news.jpg');
+    } else {
+      setHasError(true);
+    }
+  };
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = encodeURIComponent(`*${article.title}*\n\nडीडीएन प्राइम न्यूज पर पढ़ें:\n${window.location.href}`);
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    const text = encodeURIComponent(`*${article.title}*\n\nडीडीएन प्राइम न्यूज पर पढ़ें:\n${typeof window !== 'undefined' ? window.location.href : ''}`);
+    if (typeof window !== 'undefined') {
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
   };
 
   return (
@@ -25,11 +41,11 @@ export const NewsCard: React.FC<NewsCardProps> = ({ article, onSelect, onListen 
       <div>
         {/* Card Image */}
         <div className="relative aspect-[4/3] w-full bg-stone-100 overflow-hidden border-b border-stone-100">
-          {!imgError ? (
+          {!hasError ? (
             <img
-              src={article.imageUrl}
+              src={imgSrc}
               alt={article.title}
-              onError={() => setImgError(true)}
+              onError={handleImageError}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
             />

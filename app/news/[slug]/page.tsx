@@ -41,7 +41,7 @@ export async function generateMetadata(
   }
 
   const articleUrl = getArticleUrl(article.slug || slug);
-  const rawImageUrl = article.imageUrl || '/src/assets/images/ddn_hero_news_1792323529100.jpg';
+  const rawImageUrl = article.imageUrl || '/images/ddn_hero_news.jpg';
   const absoluteImageUrl = rawImageUrl.startsWith('http')
     ? rawImageUrl
     : `${SITE_CONFIG.productionDomain}${rawImageUrl.startsWith('/') ? '' : '/'}${rawImageUrl}`;
@@ -121,7 +121,7 @@ export default async function NewsSlugPage({ params }: NewsPageProps) {
     article = INITIAL_ARTICLES.find((a) => a.slug === slug || a.id === slug) || null;
   }
 
-  const rawImageUrl = article?.imageUrl || '/src/assets/images/ddn_hero_news_1792323529100.jpg';
+  const rawImageUrl = article?.imageUrl || '/images/ddn_hero_news.jpg';
   const absoluteImageUrl = rawImageUrl.startsWith('http')
     ? rawImageUrl
     : `${SITE_CONFIG.productionDomain}${rawImageUrl.startsWith('/') ? '' : '/'}${rawImageUrl}`;

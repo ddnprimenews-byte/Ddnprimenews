@@ -206,7 +206,7 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
       'url': SITE_CONFIG.productionDomain,
       'logo': {
         '@type': 'ImageObject',
-        'url': `${SITE_CONFIG.productionDomain}/src/assets/images/ddn_hero_news_1792323529100.jpg`,
+        'url': `${SITE_CONFIG.productionDomain}/images/ddn_hero_news.jpg`,
       },
     },
     'articleSection': article.categoryHindi,
@@ -356,8 +356,12 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-200 border border-stone-300 shrink-0">
                   <img
-                    src={article.authorAvatar || '/src/assets/images/ddn_reporter_press_1792323529821.jpg'}
+                    src={article.authorAvatar || '/images/ddn_reporter_press.jpg'}
                     alt={article.author}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                    }}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -468,11 +472,14 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
             <figure className="mb-6 rounded-lg overflow-hidden border border-stone-200 bg-stone-100">
               <div className="relative aspect-video w-full">
                 <img
-                  src={article.imageUrl}
+                  src={article.imageUrl || '/images/ddn_hero_news.jpg'}
                   alt={article.title}
                   loading="eager"
                   decoding="async"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                  }}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -630,10 +637,14 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
                       {/* Small Thumbnail */}
                       <div className="w-16 h-14 rounded overflow-hidden bg-stone-100 shrink-0 border border-stone-200">
                         <img
-                          src={trend.imageUrl}
+                          src={trend.imageUrl || '/images/ddn_hero_news.jpg'}
                           alt={trend.title}
                           loading="lazy"
                           decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition"
                         />
                       </div>

@@ -183,7 +183,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
       datePublished: nowIso,
       dateModified: nowIso,
       readTime: '2 मिनट',
-      imageUrl: '/src/assets/images/ddn_hero_news_1792323529100.jpg',
+      imageUrl: '/images/ddn_hero_news.jpg',
       status: articleStatus,
       views: 120,
       tags: ['डीडीएन प्राइम न्यूज', location],

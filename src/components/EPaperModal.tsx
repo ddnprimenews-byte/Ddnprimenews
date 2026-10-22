@@ -140,9 +140,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({ isOpen, onClose }) => 
             className="transition-all duration-200 bg-white shadow-2xl rounded border border-stone-300 overflow-hidden"
           >
             <img
-              src="/src/assets/images/ddn_epaper_cover_1792323531409.jpg"
+              src="/images/ddn_epaper_cover.jpg"
               alt="DDN Prime News E-Paper Broadsheet"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+              }}
               className="w-full h-auto block"
             />
           </div>

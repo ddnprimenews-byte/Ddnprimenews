@@ -233,9 +233,12 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
           {/* Main Visual */}
           <div className="mb-6 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
             <img
-              src={article.imageUrl}
+              src={article.imageUrl || '/images/ddn_hero_news.jpg'}
               alt={article.title}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+              }}
               className="w-full max-h-[460px] object-cover"
             />
             <p className="text-xs text-stone-500 italic p-2 bg-stone-50 border-t border-stone-100 text-center">

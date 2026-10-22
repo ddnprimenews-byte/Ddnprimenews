@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       datePublished: new Date().toISOString(),
       dateModified: new Date().toISOString(),
       readTime: '2 मिनट',
-      imageUrl: '/src/assets/images/ddn_hero_news_1792323529100.jpg',
+      imageUrl: '/images/ddn_hero_news.jpg',
       status: validatedData.status,
       views: 0,
       tags: ['डीडीएन प्राइम न्यूज', validatedData.location],

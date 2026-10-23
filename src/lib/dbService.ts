@@ -143,7 +143,7 @@ export const ReporterService = {
    */
   async submitApplication(app: ReporterApplication): Promise<string> {
     if (db) {
-      const docRef = doc(db, 'reporter_applications', app.id);
+      const docRef = doc(db, 'reporters', app.id);
       await setDoc(docRef, {
         ...app,
         submittedAt: new Date().toISOString(),
@@ -159,7 +159,7 @@ export const ReporterService = {
   async getApplications(): Promise<ReporterApplication[]> {
     const list: ReporterApplication[] = [];
     if (db) {
-      const colRef = collection(db, 'reporter_applications');
+      const colRef = collection(db, 'reporters');
       const snapshot = await getDocs(colRef);
       snapshot.forEach((d) => {
         list.push({ id: d.id, ...(d.data() as any) });
@@ -173,7 +173,7 @@ export const ReporterService = {
    */
   async updateStatus(id: string, status: 'pending' | 'verified' | 'rejected'): Promise<void> {
     if (db) {
-      const docRef = doc(db, 'reporter_applications', id);
+      const docRef = doc(db, 'reporters', id);
       await updateDoc(docRef, {
         status,
         updatedAt: new Date().toISOString(),

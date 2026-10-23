@@ -9,7 +9,34 @@ import { ReporterApplication } from '@/src/types/news';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const contentType = request.headers.get('content-type') || '';
+    let body: any = {};
+
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await request.formData();
+      const name = formData.get('name') || formData.get('fullName');
+      const email = formData.get('email');
+      const mobile = formData.get('mobile') || '9876543210';
+      const message = formData.get('message') || '';
+      const district = formData.get('district') || 'दरभंगा';
+
+      body = {
+        fullName: name?.toString() || '',
+        fatherName: formData.get('fatherName')?.toString() || 'श्री ' + (name?.toString() || ''),
+        mobile: mobile?.toString() || '',
+        whatsapp: formData.get('whatsapp')?.toString() || mobile?.toString() || '',
+        email: email?.toString() || '',
+        district: district?.toString() || 'दरभंगा',
+        block: formData.get('block')?.toString() || 'सदर',
+        panchayat: formData.get('panchayat')?.toString() || 'वार्ड 1',
+        qualification: formData.get('qualification')?.toString() || 'स्नातक (Graduate)',
+        experience: message ? message.toString() : (formData.get('experience')?.toString() || '1 वर्ष डिजिटल पत्रकारिता'),
+        beatPreference: formData.get('beatPreference')?.toString() || 'समसामयिक एवं स्थानीय विकास',
+        agreement: true,
+      };
+    } else {
+      body = await request.json();
+    }
 
     // Strict Zod Validation
     const validationResult = reporterApplicationSchema.safeParse(body);

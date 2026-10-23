@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ReporterApplication } from '../types/news';
 import { reporterApplicationSchema, ReporterApplicationInput } from '../lib/validations';
+import { compressImageToWebp } from '../lib/mediaOptimization';
 
 interface ReporterApplicationModalProps {
   isOpen: boolean;
@@ -70,23 +71,32 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
 
   if (!isOpen) return null;
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         alert('कृपया केवल वैध फोटो (JPG, PNG, WEBP) ही अपलोड करें।');
         return;
       }
-      if (file.size > 3 * 1024 * 1024) {
-        alert('फोटो का आकार 3MB से अधिक नहीं होना चाहिए।');
-        return;
+      try {
+        // Automatically compress photo to crisp WebP under 80KB before Firebase upload
+        const compressed = await compressImageToWebp(file, {
+          maxWidth: 600,
+          maxHeight: 800,
+          maxSizeKb: 80,
+          targetFormat: 'image/webp',
+          initialQuality: 0.85,
+        });
+        setPhotoFile(compressed.file);
+        setPhotoPreview(compressed.dataUrl);
+      } catch (err) {
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
       }
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 

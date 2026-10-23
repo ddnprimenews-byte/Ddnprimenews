@@ -10,6 +10,7 @@ import {
   History, Calendar, HelpCircle, ThumbsUp, Heart, ChevronRight,
   Sparkles, Loader2
 } from 'lucide-react';
+import { YouTubeEmbed } from './YouTubeEmbed';
 
 interface ArticleExpressDetailProps {
   article: Article;
@@ -468,25 +469,38 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
               )}
             </div>
 
-            {/* Featured Image with defined dimensions to eliminate CLS */}
-            <figure className="mb-6 rounded-lg overflow-hidden border border-stone-200 bg-stone-100">
-              <div className="relative aspect-video w-full">
-                <img
-                  src={article.imageUrl || '/images/ddn_hero_news.jpg'}
-                  alt={article.title}
-                  loading="eager"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
-                  }}
-                  className="w-full h-full object-cover"
+            {/* Media: High-Speed YouTube Lite Facade or Optimized Featured Image */}
+            {(article.videoUrl || article.youtubeId) ? (
+              <figure className="mb-6 rounded-lg overflow-hidden border border-stone-800 bg-black">
+                <YouTubeEmbed
+                  urlOrId={article.youtubeId || article.videoUrl || ''}
+                  title={article.title}
+                  customThumbnail={article.imageUrl}
                 />
-              </div>
-              <figcaption className="p-2.5 bg-stone-50 border-t border-stone-100 text-xs text-stone-600 text-center italic">
-                {article.imageCaption || `चित्र: ${article.title} (कवरेज: डीडीएन प्राइम न्यूज संवाददाता)`}
-              </figcaption>
-            </figure>
+                <figcaption className="p-2.5 bg-stone-900 border-t border-stone-800 text-xs text-stone-400 text-center">
+                  {article.imageCaption || `वीडियो रिपोर्ट: ${article.title} (डीडीएन प्राइम डिजिटल ब्रॉडकास्ट)`}
+                </figcaption>
+              </figure>
+            ) : (
+              <figure className="mb-6 rounded-lg overflow-hidden border border-stone-200 bg-stone-100">
+                <div className="relative aspect-video w-full">
+                  <img
+                    src={article.imageUrl || '/images/ddn_hero_news.jpg'}
+                    alt={article.title}
+                    loading="eager"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <figcaption className="p-2.5 bg-stone-50 border-t border-stone-100 text-xs text-stone-600 text-center italic">
+                  {article.imageCaption || `चित्र: ${article.title} (कवरेज: डीडीएन प्राइम न्यूज संवाददाता)`}
+                </figcaption>
+              </figure>
+            )}
 
             {/* In-Article Body Content */}
             <div

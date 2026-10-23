@@ -1,0 +1,26 @@
+{
+  "name": "DDN Prime News - सच्ची निष्पक्ष निर्भय निर्भिक पत्रकारिता",
+  "short_name": "DDN News",
+  "description": "उत्तर बिहार एवं देश-विदेश की ताज़ा एवं निष्पक्ष खबरें।",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e53e3e",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

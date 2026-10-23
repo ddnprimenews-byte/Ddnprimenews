@@ -53,6 +53,8 @@ export interface Article {
   views: number;
   tags: string[];
   faqs?: ArticleFAQ[];
+  videoUrl?: string;
+  youtubeId?: string;
 }
 
 export interface WeatherData {
@@ -93,6 +95,7 @@ export interface VideoBulletin {
   thumbnail: string;
   anchor: string;
   timeAgo: string;
+  youtubeUrl?: string;
 }
 
 export type LegalPageType = 

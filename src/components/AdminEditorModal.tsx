@@ -14,6 +14,9 @@ import {
   updateReporterStatusInFirestore 
 } from '../lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { OptimizedImageUploader } from './OptimizedImageUploader';
+import { YouTubeEmbed } from './YouTubeEmbed';
+import { extractYouTubeId } from '../lib/mediaOptimization';
 
 interface AdminEditorModalProps {
   isOpen: boolean;
@@ -56,6 +59,8 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   const [author, setAuthor] = useState('राजेश कुमार साहू');
   const [authorRole, setAuthorRole] = useState('मुख्य संपादक');
   const [articleStatus, setArticleStatus] = useState<'published' | 'draft'>('published');
+  const [uploadedImageUrl, setUploadedImageUrl] = useState('/images/ddn_hero_news.jpg');
+  const [videoUrl, setVideoUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
 
@@ -183,7 +188,8 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
       datePublished: nowIso,
       dateModified: nowIso,
       readTime: '2 मिनट',
-      imageUrl: '/images/ddn_hero_news.jpg',
+      imageUrl: uploadedImageUrl || '/images/ddn_hero_news.jpg',
+      ...(videoUrl.trim() ? { videoUrl: videoUrl.trim(), youtubeId: extractYouTubeId(videoUrl) || undefined } : {}),
       status: articleStatus,
       views: 120,
       tags: ['डीडीएन प्राइम न्यूज', location],
@@ -203,6 +209,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
       setSummary('');
       setAeoSummary('');
       setContentBody('');
+      setVideoUrl('');
     } catch (err: any) {
       console.error('Firestore save article error:', err);
       setSuccessMsg('त्रुटि: समाचार फायरस्टोर में सुरक्षित नहीं हो सका।');
@@ -529,10 +536,51 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                     />
                   </div>
 
+                  {/* High-Speed WebP Image Uploader (< 100KB Guaranteed) */}
+                  <div className="pt-2">
+                    <OptimizedImageUploader
+                      currentImageUrl={uploadedImageUrl}
+                      onImageSelected={(compResult, uploadedUrl) => {
+                        if (uploadedUrl) {
+                          setUploadedImageUrl(uploadedUrl);
+                        } else {
+                          setUploadedImageUrl(compResult.dataUrl);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* YouTube Video Embed Link (Zero Server/Storage Bloat) */}
+                  <div className="space-y-1.5 pt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-stone-700">
+                        यूट्यूब वीडियो लिंक (YouTube Embed Link - Optional)
+                      </label>
+                      <span className="text-[11px] text-red-600 font-semibold font-mono">
+                        Zero Storage / 100% YouTube CDN
+                      </span>
+                    </div>
+                    <input
+                      type="url"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="उदा. https://www.youtube.com/watch?v=... या https://youtu.be/..."
+                      className="w-full p-2.5 border border-stone-300 rounded focus:border-red-700 focus:outline-none text-xs font-mono"
+                    />
+                    {videoUrl.trim() && extractYouTubeId(videoUrl) && (
+                      <div className="mt-2.5 p-2 bg-stone-900 rounded-lg border border-stone-800">
+                        <span className="text-[11px] text-stone-400 font-semibold mb-1.5 block">
+                          वीडियो पूर्वावलोकन (Responsive 16:9 Lite Facade):
+                        </span>
+                        <YouTubeEmbed urlOrId={videoUrl} title={title || 'वीडियो पूर्वावलोकन'} />
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isPublishing}
-                    className="w-full py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition shadow-sm"
+                    className="w-full py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition shadow-sm cursor-pointer"
                   >
                     {isPublishing ? 'फायरस्टोर में सुरक्षित हो रहा है...' : 'फायरबेस फायरस्टोर में समाचार प्रकाशित करें'}
                   </button>

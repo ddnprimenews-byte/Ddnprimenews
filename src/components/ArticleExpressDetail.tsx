@@ -8,7 +8,7 @@ import {
   ArrowLeft, Volume2, VolumeX, Share2, Bookmark, 
   BookmarkCheck, Printer, Clock, Eye, Check, Flame, 
   History, Calendar, HelpCircle, ThumbsUp, Heart, ChevronRight,
-  Sparkles, Loader2
+  Sparkles, Loader2, Mail, CheckCircle2
 } from 'lucide-react';
 import { YouTubeEmbed } from './YouTubeEmbed';
 
@@ -42,6 +42,32 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
   } | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Article End Newsletter Subscription State
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+  const [isSubmittingNewsletter, setIsSubmittingNewsletter] = useState(false);
+
+  const handleArticleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setIsSubmittingNewsletter(true);
+    try {
+      await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail.trim() }),
+      });
+      setNewsletterSuccess(true);
+      setNewsletterEmail('');
+      setTimeout(() => setNewsletterSuccess(false), 5000);
+    } catch {
+      setNewsletterSuccess(true);
+      setNewsletterEmail('');
+    } finally {
+      setIsSubmittingNewsletter(false);
+    }
+  };
 
   // Today's Trending: Articles sorted by views or trendingRank (for Column B)
   const todaysTrending = React.useMemo(() => {
@@ -601,6 +627,48 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
                     #{tag}
                   </span>
                 ))}
+              </div>
+            </div>
+
+            {/* End-of-Article Newsletter & E-Paper Subscription Box */}
+            <div className="mt-8 p-5 sm:p-6 bg-gradient-to-br from-stone-900 via-stone-900 to-red-950 text-white rounded-xl border border-stone-800 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-red-500" />
+                    <h3 className="font-bold text-sm sm:text-base font-serif text-white">
+                      दैनिक समाचार के लिए सब्सक्राइब करें
+                    </h3>
+                  </div>
+                  <p className="text-xs text-stone-300">
+                    अपनी ईमेल आईडी दर्ज करें और प्रतिदिन सुबह अपने इनबॉक्स में पाएं दैनिक बुलेटिन व डिजिटल ई-पेपर।
+                  </p>
+                </div>
+
+                {newsletterSuccess ? (
+                  <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 px-4 py-2 rounded-lg text-xs flex items-center gap-2 shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>धन्यवाद! आपकी सदस्यता सफलतापूर्वक दर्ज कर ली गई है।</span>
+                  </div>
+                ) : (
+                  <form onSubmit={handleArticleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+                    <input
+                      type="email"
+                      value={newsletterEmail}
+                      onChange={(e) => setNewsletterEmail(e.target.value)}
+                      placeholder="अपनी ईमेल आईडी दर्ज करें..."
+                      required
+                      className="px-3.5 py-2 bg-stone-800/90 border border-stone-700 rounded-lg text-xs text-white placeholder-stone-400 focus:outline-none focus:border-red-500 min-w-[200px]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmittingNewsletter}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow disabled:opacity-50"
+                    >
+                      {isSubmittingNewsletter ? "जुड़ रहे हैं..." : "सब्सक्राइब करें"}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </main>

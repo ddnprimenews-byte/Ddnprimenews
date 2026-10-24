@@ -383,19 +383,7 @@ export default function App({
         fontSize === 'large' ? 'text-[17px]' : fontSize === 'xlarge' ? 'text-[19px]' : 'text-base'
       }`}
     >
-      {/* 1. TOP RED BAR */}
-      <TopBar
-        currentDate={currentDate}
-        weatherList={weatherList}
-        selectedCity={selectedCity}
-        onSelectCity={setSelectedCity}
-        onOpenReporterModal={() => setIsReporterModalOpen(true)}
-        onOpenAdminDesk={() => setIsAdminDeskOpen(true)}
-        fontSize={fontSize}
-        onCycleFontSize={handleCycleFontSize}
-      />
-
-      {/* 2. LOGO & HEADER (INTEGRATED MAROON NAVIGATION BAR) */}
+      {/* 1. LOGO & HEADER (CENTERED BRAND STRIP + MAROON NAVIGATION BAR) */}
       <Header
         searchQuery={searchQuery}
         onSearchChange={(q) => {
@@ -1005,6 +993,7 @@ export default function App({
       <Footer
         onOpenReporterModal={() => setIsReporterModalOpen(true)}
         onOpenEPaper={() => setIsEPaperModalOpen(true)}
+        onOpenLiveVideo={() => setIsVideoModalOpen(true)}
         onSelectCategory={handleSelectCategory}
         onSelectLegalPage={handleSelectLegalPage}
         onOpenAdminDesk={() => setIsAdminDeskOpen(true)}

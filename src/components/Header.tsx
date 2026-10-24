@@ -28,7 +28,8 @@ export default function Header({
   const [fontSize, setFontSize] = useState(100); // Percentage for auto scaling/resizing
   const [internalSearch, setInternalSearch] = useState(searchQuery);
 
-  const LOGO_URL = "https://ibb.co/LdRr3RYv";
+  const LOGO_URL = "/logo.png";
+  const FALLBACK_LOGO = "https://i.ibb.co/VY9xs9J3/file-0000000042f88211ae847c19f18a28c0.png";
   const HEALTH_GUIDE_URL = "https://hindihealthguide.org";
 
   useEffect(() => {
@@ -82,11 +83,10 @@ export default function Header({
   return (
     <header className="w-full bg-white shadow-md font-sans transition-all">
       {/* ========================================================= */}
-      {/* 1. बीच की सफ़ेद पट्टी (Middle White Strip - Fully Centered) */}
+      {/* 1. बीच की सफ़ेद पट्टी (Middle White Strip - Logo Beside Title & Motto) */}
       {/* ========================================================= */}
-      <div className="w-full border-b border-gray-200 py-4 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center text-center">
-          {/* ब्रांड लोगो */}
+      <div className="w-full border-b border-gray-200 py-3 sm:py-4 px-4 sm:px-8 bg-white">
+        <div className="max-w-7xl mx-auto flex items-center justify-center">
           <Link 
             href="/" 
             onClick={(e) => {
@@ -95,28 +95,28 @@ export default function Header({
                 handleHomeClick();
               }
             }}
-            className="mb-2 inline-block group"
+            className="flex items-center gap-3.5 sm:gap-5 group cursor-pointer"
           >
+            {/* ब्रांड लोगो - नाम के बगल में */}
             <img
               src={LOGO_URL}
               alt="DDN Prime News Logo"
               onError={(e) => {
-                // Graceful fallback to local icon if external link is restricted
-                (e.currentTarget as HTMLImageElement).src = '/icon.png';
+                (e.currentTarget as HTMLImageElement).src = FALLBACK_LOGO;
               }}
-              className="h-20 w-auto object-contain mx-auto transition-transform group-hover:scale-105"
+              className="h-16 sm:h-20 md:h-24 w-auto object-contain shrink-0 transition-transform group-hover:scale-105 drop-shadow-xs"
             />
+
+            {/* चैनल का नाम एवं सबटाइटल - नाम ऊपर, सबटाइटल ठीक नीचे */}
+            <div className="flex flex-col justify-center text-left">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight font-serif leading-none bg-gradient-to-r from-red-950 via-red-800 to-red-600 bg-clip-text text-transparent">
+                DDN PRIME NEWS
+              </h1>
+              <p className="text-xs sm:text-base md:text-lg font-bold text-red-700 tracking-wide mt-1 sm:mt-1.5 leading-snug">
+                सच्ची निर्भीक और निष्पक्ष पत्रकारिता
+              </p>
+            </div>
           </Link>
-
-          {/* चैनल का नाम (Max Bold & Professional Style) */}
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 font-serif my-1">
-            DDN PRIME NEWS
-          </h1>
-
-          {/* चैनल का मोटो */}
-          <p className="text-base sm:text-lg font-bold text-red-700 mt-1">
-            सच्ची निर्भीक और निष्पक्ष पत्रकारिता
-          </p>
         </div>
       </div>
 
@@ -234,19 +234,6 @@ export default function Header({
               >
                 हेल्थ गाइड
               </a>
-              
-              <Link 
-                href="/team" 
-                onClick={(e) => {
-                  if (onSelectCategory) {
-                    e.preventDefault();
-                    handleCategoryClick('team');
-                  }
-                }}
-                className="px-2 py-1 rounded hover:bg-red-900 transition"
-              >
-                हमारी टीम
-              </Link>
 
               {/* लाइव बुलेटिन */}
               <button

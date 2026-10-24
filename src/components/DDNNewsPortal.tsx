@@ -395,7 +395,7 @@ export default function App({
         onCycleFontSize={handleCycleFontSize}
       />
 
-      {/* 2. LOGO & HEADER */}
+      {/* 2. LOGO & HEADER (INTEGRATED MAROON NAVIGATION BAR) */}
       <Header
         searchQuery={searchQuery}
         onSearchChange={(q) => {
@@ -406,15 +406,7 @@ export default function App({
         onOpenLiveVideo={() => setIsVideoModalOpen(true)}
         onOpenAdminDesk={() => setIsAdminDeskOpen(true)}
         onBackToHome={handleBackToHome}
-      />
-
-      {/* 3. MAROON CATEGORY BAR */}
-      <Navbar
-        activeCategory={activeCategory}
         onSelectCategory={handleSelectCategory}
-        onOpenEPaper={() => setIsEPaperModalOpen(true)}
-        onOpenReporterModal={() => setIsReporterModalOpen(true)}
-        onOpenAdminDesk={() => setIsAdminDeskOpen(true)}
       />
 
       {/* 4. BREAKING NEWS TICKER */}

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import Link from 'next/link';
 import { AlertTriangle, RefreshCw, Home, ShieldAlert, Phone, Mail } from 'lucide-react';
 import { SITE_CONFIG } from '@/src/config/site';
 
@@ -14,7 +13,7 @@ interface ErrorProps {
  * Production-Grade Global Error Boundary for DDN Prime News
  * Prevents portal crashes by presenting a graceful Hindi/English recovery interface
  */
-export default function GlobalError({ error, reset }: ErrorProps) {
+export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
     // Log the error to reporting service in production
     console.error('DDN Prime News Portal Error Caught:', error);
@@ -63,13 +62,13 @@ export default function GlobalError({ error, reset }: ErrorProps) {
               <span>पुनः प्रयास करें (Retry)</span>
             </button>
 
-            <Link
+            <a
               href="/"
               className="w-full sm:w-1/2 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg transition border border-stone-300 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer active:scale-95"
             >
               <Home className="w-4 h-4" />
               <span>होमपेज पर जाएं</span>
-            </Link>
+            </a>
           </div>
 
           {/* Emergency Editorial Helpline */}

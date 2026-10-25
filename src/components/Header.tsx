@@ -85,7 +85,7 @@ export default function Header({
       {/* ========================================================= */}
       {/* 1. बीच की सफ़ेद पट्टी (Middle White Strip - Logo Beside Title & Motto) */}
       {/* ========================================================= */}
-      <div className="w-full border-b border-gray-200 py-3 sm:py-4 px-4 sm:px-8 bg-white">
+      <div className="w-full border-b border-gray-200 py-2 sm:py-4 px-2 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto flex items-center justify-center">
           <Link 
             href="/" 
@@ -95,24 +95,24 @@ export default function Header({
                 handleHomeClick();
               }
             }}
-            className="flex items-center gap-3.5 sm:gap-5 group cursor-pointer"
+            className="flex flex-row flex-nowrap items-center gap-2 sm:gap-4 md:gap-5 group cursor-pointer select-none max-w-full"
           >
-            {/* ब्रांड लोगो - नाम के बगल में */}
+            {/* ब्रांड लोगो - नाम के बगल में (Auto-compressed on Mobile) */}
             <img
               src={LOGO_URL}
               alt="DDN Prime News Logo"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = FALLBACK_LOGO;
               }}
-              className="h-16 sm:h-20 md:h-24 w-auto object-contain shrink-0 transition-transform group-hover:scale-105 drop-shadow-xs"
+              className="h-12 w-12 xs:h-14 xs:w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-28 lg:w-28 object-contain shrink-0 transition-transform group-hover:scale-105 drop-shadow-xs"
             />
 
             {/* चैनल का नाम एवं सबटाइटल - नाम ऊपर, सबटाइटल ठीक नीचे */}
-            <div className="flex flex-col justify-center text-left">
-              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight font-serif leading-none bg-gradient-to-r from-red-950 via-red-800 to-red-600 bg-clip-text text-transparent">
+            <div className="flex flex-col justify-center text-left min-w-0">
+              <h1 className="text-xl xs:text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-serif leading-none whitespace-nowrap bg-gradient-to-r from-red-950 via-red-800 to-red-600 bg-clip-text text-transparent">
                 DDN PRIME NEWS
               </h1>
-              <p className="text-xs sm:text-base md:text-lg font-bold text-red-700 tracking-wide mt-1 sm:mt-1.5 leading-snug">
+              <p className="text-[10px] xs:text-xs sm:text-base md:text-lg font-bold text-black tracking-wide mt-0.5 sm:mt-1.5 leading-tight whitespace-nowrap">
                 सच्ची निर्भीक और निष्पक्ष पत्रकारिता
               </p>
             </div>

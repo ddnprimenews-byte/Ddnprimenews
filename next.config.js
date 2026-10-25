@@ -25,43 +25,6 @@ const nextConfig = {
       },
     ],
   },
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'ddnprimenews.in',
-          },
-        ],
-        destination: 'https://ddnprimenews.com/:path*',
-        permanent: true,
-      },
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.ddnprimenews.in',
-          },
-        ],
-        destination: 'https://ddnprimenews.com/:path*',
-        permanent: true,
-      },
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.ddnprimenews.com',
-          },
-        ],
-        destination: 'https://ddnprimenews.com/:path*',
-        permanent: true,
-      },
-    ];
-  },
 };
 
 export default nextConfig;

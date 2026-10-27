@@ -11,6 +11,7 @@ import { NewsCategory, LegalPageType } from "../types/news";
 
 interface FooterProps {
   onOpenReporterModal?: () => void;
+  onOpenReporterLogin?: () => void;
   onOpenEPaper?: () => void;
   onOpenLiveVideo?: () => void;
   onSelectCategory?: (cat: NewsCategory) => void;
@@ -20,6 +21,7 @@ interface FooterProps {
 
 export default function Footer({
   onOpenReporterModal,
+  onOpenReporterLogin,
   onOpenEPaper,
   onOpenLiveVideo,
   onSelectCategory,
@@ -234,27 +236,44 @@ export default function Footer({
                   </button>
                 </li>
               )}
-              {onOpenReporterModal && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={onOpenReporterModal}
-                    className="hover:text-white transition flex items-center gap-1.5 cursor-pointer text-amber-300 font-medium"
-                  >
-                    <UserCheck className="w-3 h-3 text-yellow-400" />
-                    <span>पत्रकार भर्ती आवेदन 2026</span>
-                  </button>
-                </li>
-              )}
+              {/* 1. संपादक एवं एडमिन लॉगिन */}
               {onOpenAdminDesk && (
                 <li>
                   <button
                     type="button"
                     onClick={onOpenAdminDesk}
-                    className="hover:text-white transition flex items-center gap-1.5 cursor-pointer text-stone-400 text-[11px]"
+                    className="hover:text-amber-300 transition flex items-center gap-1.5 cursor-pointer text-stone-300 text-xs font-semibold"
                   >
-                    <Lock className="w-3 h-3 text-amber-500" />
-                    <span>संपादक एवं एडमिन डेस्क लॉगिन</span>
+                    <Lock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>संपादक एवं एडमिन लॉगिन (Admin Desk)</span>
+                  </button>
+                </li>
+              )}
+
+              {/* 2. रिपोर्टर लॉगिन */}
+              {onOpenReporterLogin && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={onOpenReporterLogin}
+                    className="hover:text-amber-300 transition flex items-center gap-1.5 cursor-pointer text-amber-400 text-xs font-bold"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>रिपोर्टर लॉगिन (Reporter Portal)</span>
+                  </button>
+                </li>
+              )}
+
+              {/* 3. रिपोर्टर आवेदन */}
+              {onOpenReporterModal && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={onOpenReporterModal}
+                    className="hover:text-white transition flex items-center gap-1.5 cursor-pointer text-stone-300 text-xs font-medium"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-red-400" />
+                    <span>रिपोर्टर आवेदन (पत्रकार भर्ती 2026)</span>
                   </button>
                 </li>
               )}

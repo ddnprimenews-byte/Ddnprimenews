@@ -25,6 +25,7 @@ import { VideoModal } from './VideoModal';
 import { TeamSection } from './TeamSection';
 import { HealthEducationSection } from './HealthEducationSection';
 import { AdminEditorModal } from './AdminEditorModal';
+import { ReporterDeskModal } from './ReporterDeskModal';
 import { Footer } from './Footer';
 
 import { useForm } from 'react-hook-form';
@@ -83,6 +84,7 @@ export default function App({
 
   // Modals
   const [isReporterModalOpen, setIsReporterModalOpen] = useState(false);
+  const [isReporterLoginOpen, setIsReporterLoginOpen] = useState(false);
   const [isEPaperModalOpen, setIsEPaperModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isAdminDeskOpen, setIsAdminDeskOpen] = useState(false);
@@ -992,6 +994,7 @@ export default function App({
       {/* 10. FOOTER & EDITORIAL DETAILS */}
       <Footer
         onOpenReporterModal={() => setIsReporterModalOpen(true)}
+        onOpenReporterLogin={() => setIsReporterLoginOpen(true)}
         onOpenEPaper={() => setIsEPaperModalOpen(true)}
         onOpenLiveVideo={() => setIsVideoModalOpen(true)}
         onSelectCategory={handleSelectCategory}
@@ -1003,6 +1006,13 @@ export default function App({
       <ReporterApplicationModal
         isOpen={isReporterModalOpen}
         onClose={() => setIsReporterModalOpen(false)}
+      />
+
+      <ReporterDeskModal
+        isOpen={isReporterLoginOpen}
+        onClose={() => setIsReporterLoginOpen(false)}
+        onAddArticle={handleAddArticle}
+        articles={articles}
       />
 
       <EPaperModal

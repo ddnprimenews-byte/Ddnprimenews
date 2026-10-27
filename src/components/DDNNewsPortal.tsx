@@ -1008,6 +1008,8 @@ export default function App({
       <EPaperModal
         isOpen={isEPaperModalOpen}
         onClose={() => setIsEPaperModalOpen(false)}
+        articles={publishedArticles}
+        onSelectArticle={handleSelectArticle}
       />
 
       <VideoModal

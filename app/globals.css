@@ -37,3 +37,46 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ========================================================================= */
+/* PRINT SETUP FOR DIGITAL E-PAPER & NEWS ARTICLES                          */
+/* ========================================================================= */
+@media print {
+  @page {
+    size: A3 portrait;
+    margin: 8mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide unnecessary elements during print */
+  header, footer, nav, aside, button, .no-print {
+    display: none !important;
+  }
+
+  /* EPaper print container */
+  .epaper-print-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .epaper-sheet-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin-bottom: 20px !important;
+    background: #ffffff !important;
+  }
+}
+

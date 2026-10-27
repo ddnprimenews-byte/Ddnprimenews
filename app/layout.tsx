@@ -4,15 +4,15 @@ import { OrganizationSchema, WebsiteSearchSchema } from '@/components/Structured
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ddnprimenews.com'),
-  title: 'DDN Prime News | दरभंगा डिजिटल नेटवर्क',
-  description: 'DDN Prime News (दरभंगा डिजिटल नेटवर्क) — सच्ची निष्पक्ष निर्भय निर्भीक पत्रकारिता। उत्तर बिहार, मिथिलांचल एवं राष्ट्रीय घटनाओं की प्रामाणिक कवरेज, लाइव वीडियो बुलेटिन्स, डिजिटल ई-पेपर एवं निष्पक्ष विश्लेषण (MSME Registered: UDYAM-BR-09-0028491)',
+  title: 'DDN Prime News | दैनिक डिजिटल ई-पेपर एवं ताज़ा समाचार',
+  description: 'DDN Prime News (दरभंगा डिजिटल नेटवर्क) — दैनिक डिजिटल ई-पेपर, ताज़ा समाचार, लाइव बुलेटिन एवं निष्पक्ष विश्लेषण। उत्तर बिहार, मिथिलांचल एवं देश की प्रमुख खबरें।',
   applicationName: 'DDN Prime News',
   authors: [{ name: 'दरभंगा डिजिटल नेटवर्क', url: 'https://ddnprimenews.com' }],
   generator: 'Next.js',
-  keywords: ['DDN Prime News', 'Darbhanga News', 'Bihar News', 'हिंदी समाचार', 'दरभंगा डिजिटल नेटवर्क', 'Breaking News', 'सच्ची निष्पक्ष निर्भय निर्भीक पत्रकारिता'],
+  keywords: ['DDN Prime News', 'Darbhanga News', 'Bihar News', 'हिंदी समाचार', 'दरभंगा डिजिटल नेटवर्क', 'डिजिटल ई-पेपर', 'Breaking News'],
   openGraph: {
-    title: 'DDN Prime News | दरभंगा डिजिटल नेटवर्क',
-    description: 'DDN Prime News (दरभंगा डिजिटल नेटवर्क) — सच्ची निष्पक्ष निर्भय निर्भीक पत्रकारिता। उत्तर बिहार, मिथिलांचल एवं राष्ट्रीय घटनाओं की प्रामाणिक कवरेज, लाइव वीडियो बुलेटिन्स, डिजिटल ई-पेपर एवं निष्पक्ष विश्लेषण (MSME Registered: UDYAM-BR-09-0028491)',
+    title: 'DDN Prime News | दैनिक डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)',
+    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) एवं ताज़ा समाचार पढ़ें। दरभंगा डिजिटल नेटवर्क की निष्पक्ष पत्रकारिता।',
     url: 'https://ddnprimenews.com',
     siteName: 'DDN Prime News',
     locale: 'hi_IN',
@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   twitter: {
     card: 'summary_large_image',
-    title: 'DDN Prime News | दरभंगा डिजिटल नेटवर्क',
-    description: 'DDN Prime News (दरभंगा डिजिटल नेटवर्क) — सच्ची निष्पक्ष निर्भय निर्भीक पत्रकारिता। उत्तर बिहार, मिथिलांचल एवं राष्ट्रीय घटनाओं की प्रामाणिक कवरेज (MSME Registered)',
+    title: 'DDN Prime News | दैनिक डिजिटल ई-पेपर',
+    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) एवं ताज़ा समाचार पढ़ें।',
   },
 };
 

@@ -30,10 +30,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shareToast, setShareToast] = useState('');
   
-  // PDF Generation State
+  // PDF Generation & Print State
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
+  const [pdfProcessingPage, setPdfProcessingPage] = useState<number>(1);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [pdfSuccessModal, setPdfSuccessModal] = useState<{ isOpen: boolean; message: string; pdfUrl?: string } | null>(null);
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -90,13 +92,14 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   };
 
   // ===================================================================
-  // ENGINE: REAL 8-PAGE BROADSHEET PDF GENERATION (jsPDF + html2canvas)
+  // ENGINE: SEQUENTIAL REAL BROADSHEET PDF GENERATION (jsPDF + html2canvas)
+  // No negative coordinates, no opacity bugs, no blank white pages!
   // ===================================================================
   const generatePdfBlob = async (mode: 'all' | 'single', targetPage?: number): Promise<{ blob: Blob; fileName: string }> => {
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a3', // Standard broadsheet newspaper proportion (A3: 297mm x 420mm)
+      format: 'a3', // Standard broadsheet proportion (A3: 297mm x 420mm)
       compress: true,
     });
 
@@ -105,26 +108,28 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       ? 'DDN_Prime_News_8_Pages_EPaper.pdf' 
       : `DDN_Prime_News_Page_${pagesToRender[0]}.pdf`;
 
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+
     for (let i = 0; i < pagesToRender.length; i++) {
       const pNum = pagesToRender[i];
-      setPdfProgress(`पेज ${pNum} / ${pagesToRender.length} का ब्रॉडशीट तैयार हो रहा है...`);
+      setPdfProcessingPage(pNum);
+      setPdfProgress(`पृष्ठ ${pNum} / ${pagesToRender.length} का ब्रॉडशीट तैयार हो रहा है...`);
 
-      // For single page matching active view, snapshot active element directly
-      const isVisibleActive = mode === 'single' && pNum === pageNumber;
-      const targetElement = isVisibleActive 
-        ? document.getElementById('active-broadsheet-page') 
-        : document.getElementById(`newspaper-broadsheet-page-${pNum}`);
+      // Allow React to re-render the capture stage and DOM to settle
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
-      if (targetElement) {
+      const stageElement = document.getElementById('pdf-capture-stage');
+      if (stageElement) {
         try {
-          // Brief settle delay to guarantee styles and fonts are applied
-          const canvas = await html2canvas(targetElement as HTMLElement, {
-            scale: 1.3, // High-clarity broadsheet print resolution
+          const canvas = await html2canvas(stageElement, {
+            scale: 1.25, // High crispness for text & photos
             useCORS: true,
-            allowTaint: false, // Must be false so toDataURL never throws SecurityError
-            logging: false,
+            allowTaint: false,
             backgroundColor: '#fcfbf7',
             windowWidth: 1050,
+            scrollX: 0,
+            scrollY: 0,
           });
 
           let imgData: string | null = null;
@@ -140,9 +145,6 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
           }
 
           if (imgData) {
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
             if (i > 0) {
               pdf.addPage('a3', 'portrait');
             }
@@ -175,13 +177,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
       setPdfSuccessModal({
         isOpen: true,
-        message: '8-पृष्ठों का संपूर्ण ई-पेपर ब्रॉडशीट PDF आपके डिवाइस पर सफलतापूर्वक डाउनलोड हो चुका है!',
+        message: '8 पृष्ठों का संपूर्ण ई-पेपर ब्रॉडशीट PDF आपके डिवाइस पर सफलतापूर्वक डाउनलोड हो चुका है!',
         pdfUrl: downloadUrl,
       });
       setShareToast('8-पृष्ठ संपूर्ण ई-पेपर पीडीएफ डाउनलोड सफल!');
     } catch (err: any) {
       console.error('PDF download error:', err);
-      // Fail-safe print fallback
       window.print();
     } finally {
       setIsGeneratingPdf(false);
@@ -216,19 +217,16 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     }
   };
 
-  // 3. WHATSAPP & WEB SHARE: Attaching Actual PDF Document + Online Link
+  // 3. WHATSAPP & WEB SHARE: Attaching Actual PDF Document + Clean Links (NO MSME NUMBER)
   const handleSharePdfToWhatsApp = async () => {
     setIsGeneratingPdf(true);
     setPdfProgress('व्हाट्सएप हेतु 8-पृष्ठ ई-पेपर पीडीएफ तैयार हो रहा है...');
     try {
       const { blob, fileName } = await generatePdfBlob('all');
       const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
-      
-      const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
-      const shareText = `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n\n📄 8 पृष्ठों का संपूर्ण ई-पेपर पीडीएफ संलग्न है।\n🌐 ऑनलाइन पढ़ने के लिए लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · भारत सरकार MSME: UDYAM-BR-09-0028491)`;
-
-      // Step A: Auto-download the file to user's device so they have the file ready
       const downloadUrl = URL.createObjectURL(blob);
+      
+      // Step A: Auto-download the file to user's device so they have the file ready
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = fileName;
@@ -236,40 +234,44 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       a.click();
       document.body.removeChild(a);
 
+      const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
+      const cleanShareText = `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n\n📄 8 पृष्ठों का संपूर्ण ई-पेपर PDF संलग्न / उपलब्ध है।\n🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
+
       // Step B: Native Web Share API with File Attachment (Supported on Android Chrome & iOS Safari)
       let shareHandled = false;
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         try {
           await navigator.share({
             files: [pdfFile],
-            title: 'डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (8 पृष्ठ)',
-            text: shareText,
+            title: 'डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)',
+            text: cleanShareText,
           });
           shareHandled = true;
           setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ साझा हो गया!');
-        } catch (shareErr) {
-          console.log('Native share canceled or fallback:', shareErr);
+        } catch (shareErr: any) {
+          if (shareErr.name !== 'AbortError') {
+            console.log('Native share fallback:', shareErr);
+          }
         }
       }
 
-      // Step C: Fallback for WhatsApp (opens WhatsApp with formatted message + instruction)
+      // Step C: Fallback for WhatsApp (opens WhatsApp with clean formatted message, NO MSME text)
       if (!shareHandled) {
         const waText = encodeURIComponent(
-          `*डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\n📄 8 पृष्ठों की ई-पेपर पीडीएफ आपके डिवाइस पर डाउनलोड हो चुकी है ('${fileName}'), कृपया चैट में 📎 (Attach Document) से भेजें।\n\n🌐 ऑनलाइन ई-पेपर लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · MSME Reg: UDYAM-BR-09-0028491)`
+          `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\n📄 8 पृष्ठों की ई-पेपर PDF ('${fileName}') आपके डिवाइस पर डाउनलोड हो चुकी है। कृपया इस चैट में 📎 (दस्तावेज़ / Document) पर क्लिक करके इसे भेजें।\n\n🌐 ऑनलाइन ई-पेपर लिंक:\n${shareUrl}`
         );
         window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
         setPdfSuccessModal({
           isOpen: true,
-          message: 'ई-पेपर PDF डाउनलोड हो चुका है और व्हाट्सएप विंडो खुल गई है! व्हाट्सएप चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई पीडीएफ फाइल चुनें।',
+          message: `8 पृष्ठों का ई-पेपर PDF ('${fileName}') आपके डिवाइस में डाउनलोड हो चुका है और व्हाट्सएप विंडो खुल गई है! व्हाट्सएप चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई फाइल भेजें।`,
           pdfUrl: downloadUrl,
         });
       }
     } catch (err: any) {
       console.error('WhatsApp PDF share error:', err);
-      // Fallback: Open WhatsApp with direct text link
       const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
       const waText = encodeURIComponent(
-        `*डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर*\n\nआज का ताजा 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क)`
+        `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\nआज का ताज़ा 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}`
       );
       window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
     } finally {
@@ -278,28 +280,32 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     }
   };
 
-  // Standard Web Share Link Fallback
+  // Standard Web Share Link Fallback (NO MSME text)
   const handleShareLink = async () => {
     const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper&page=${pageNumber}` : 'https://ddnprimenews.com';
     const shareTitle = `डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (पृष्ठ ${pageNumber}: ${pageMeta[pageNumber - 1]?.title})`;
-    const shareText = `दैनिक डिजिटल ई-पेपर (8 पृष्ठों का संपूर्ण ब्रॉडशीट संस्करण) - दरभंगा डिजिटल नेटवर्क। आज ही ऑनलाइन पढ़ें:`;
+    const shareText = `दैनिक डिजिटल ई-पेपर (8 पृष्ठों का संपूर्ण ब्रॉडशीट संस्करण)। आज ही ऑनलाइन पढ़ें:`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
           title: shareTitle,
-          text: `${shareText}\n${shareUrl}`,
+          text: shareText,
           url: shareUrl,
         });
-        return;
-      } catch (err) {}
+      } catch (err) {
+        // User canceled share
+      }
+    } else {
+      navigator.clipboard?.writeText(shareUrl);
+      setShareToast('ई-पेपर लिंक कॉपी हो गया!');
+      setTimeout(() => setShareToast(''), 3000);
     }
+  };
 
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(`${shareTitle}\n${shareUrl}`);
-      setShareToast('ई-पेपर लिंक क्लिपबोर्ड में कॉपी हो गया है!');
-      setTimeout(() => setShareToast(''), 4000);
-    }
+  // Clean Print Handler
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -453,8 +459,8 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
             {/* 3. PRINT MODE */}
             <button
-              onClick={() => window.print()}
-              className="px-2.5 py-1.5 bg-red-900 hover:bg-red-950 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer border border-red-800 hidden md:inline-flex"
+              onClick={handlePrint}
+              className="px-2.5 py-1.5 bg-red-900 hover:bg-red-950 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer border border-red-800"
               title="8 पृष्ठ प्रिंट करें"
             >
               <Printer className="w-3.5 h-3.5 text-amber-300" />
@@ -546,14 +552,6 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
           </div>
         </div>
 
-        {/* PDF Generation Progress Bar */}
-        {isGeneratingPdf && (
-          <div className="bg-amber-500 text-stone-950 px-4 py-2.5 text-xs font-black flex items-center justify-center gap-2 shrink-0 animate-pulse no-print shadow-inner">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>{pdfProgress || 'ई-पेपर उच्च-गुणवत्ता ब्रॉडशीट PDF तैयार हो रहा है, कृपया प्रतीक्षा करें...'}</span>
-          </div>
-        )}
-
         {/* Share Feedback Toast */}
         {shareToast && !isGeneratingPdf && (
           <div className="bg-emerald-600 text-white text-xs px-4 py-2 text-center font-bold animate-in fade-in slide-in-from-top-1 no-print">
@@ -561,12 +559,71 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
           </div>
         )}
 
+        {/* FULL-SCREEN PDF GENERATION OVERLAY WITH PROGRESS BAR */}
+        {isGeneratingPdf && (
+          <div className="fixed inset-0 z-100000 bg-stone-950/80 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 border border-stone-200 animate-in fade-in zoom-in-95">
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-100 flex items-center justify-center text-red-700 animate-pulse">
+                <Newspaper className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-stone-900 font-serif">
+                  ई-पेपर ब्रॉडशीट PDF तैयार हो रहा है
+                </h3>
+                <p className="text-xs text-stone-600 mt-1 font-sans">
+                  मानक A3 आकार में सभी पृष्ठों का उच्च-गुणवत्ता ब्रॉडशीट लेआउट प्रोसेस किया जा रहा है
+                </p>
+              </div>
+
+              {/* Progress pill & bar */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between text-xs font-bold font-sans text-stone-700">
+                  <span>{pdfProgress || 'प्रोसेसिंग...'}</span>
+                  <span className="text-red-700 font-mono">पृष्ठ {pdfProcessingPage} / 8</span>
+                </div>
+                <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-red-700 h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${(pdfProcessingPage / 8) * 100}%` }}
+                  />
+                </div>
+              </div>
+              
+              <p className="text-[11px] text-stone-500 italic">
+                कृपया ब्राउज़र विंडो बंद न करें, कुछ ही क्षणों में पीडीएफ डाउनलोड शुरू होगा...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* DEDICATED VISIBLE CAPTURE STAGE FOR PDF GENERATION */}
+        {/* Rendered at full opacity and natural (0,0) coordinates for flawless html2canvas export */}
+        {isGeneratingPdf && (
+          <div
+            id="pdf-capture-stage"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '1050px',
+              minHeight: '1485px',
+              zIndex: 99990,
+              backgroundColor: '#fcfbf7',
+              pointerEvents: 'none',
+              overflow: 'visible',
+            }}
+            className="p-7 font-serif text-stone-900 shadow-none border-none"
+          >
+            {renderPageContent(pdfProcessingPage, newsDataset, onSelectArticle)}
+          </div>
+        )}
+
         {/* ========================================================= */}
-        {/* BROADSHEET CANVAS VIEWPORT                                */}
+        {/* BROADSHEET CANVAS VIEWPORT (Screen View)                  */}
         {/* ========================================================= */}
         <div 
           id="newspaper-viewport" 
-          className="flex-grow overflow-auto p-2 sm:p-6 flex items-start justify-center bg-stone-300/80 transition-all print:p-0 print:bg-white print:overflow-visible"
+          className="flex-grow overflow-auto p-2 sm:p-6 flex items-start justify-center bg-stone-300/80 transition-all print:hidden"
         >
           {/* Main Printable / Renderable Container */}
           <div 
@@ -576,39 +633,22 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
               maxWidth: zoomLevel > 100 ? `${1050 * (zoomLevel / 100)}px` : '1050px',
               minWidth: '320px' 
             }}
-            className="transition-all duration-150 shadow-2xl bg-[#fcfbf7] text-stone-900 border border-stone-400 print:shadow-none print:border-none print:w-full print:max-w-none print:bg-white"
+            className="transition-all duration-150 shadow-2xl bg-[#fcfbf7] text-stone-900 border border-stone-400"
           >
             {/* Single active page view on screen */}
             <div id="active-broadsheet-page" className="broadsheet-page-wrapper p-4 sm:p-7">
               {renderPageContent(pageNumber, newsDataset, onSelectArticle)}
             </div>
           </div>
+        </div>
 
-          {/* Non-hidden off-screen container holding all 8 pages for html2canvas rendering */}
-          {/* IMPORTANT: position:fixed with large negative left so it is NEVER display:none and NEVER crashes html2canvas */}
-          <div 
-            aria-hidden="true"
-            style={{
-              position: 'fixed',
-              top: '-15000px',
-              left: '0px',
-              width: '1050px',
-              zIndex: -100,
-              pointerEvents: 'none',
-              opacity: '0.01',
-            }}
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-              <div 
-                key={`offscreen-${num}`}
-                id={`newspaper-broadsheet-page-${num}`}
-                style={{ width: '1050px', minHeight: '1485px', maxHeight: '1485px', overflow: 'hidden' }}
-                className="bg-[#fcfbf7] text-stone-900 p-7 font-serif"
-              >
-                {renderPageContent(num, newsDataset, onSelectArticle)}
-              </div>
-            ))}
-          </div>
+        {/* PRINT CONTAINER: All 8 pages rendered for window.print() */}
+        <div className="hidden print:block epaper-print-container">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+            <div key={`print-page-${num}`} className="epaper-sheet-page p-6 bg-white text-stone-900 font-serif">
+              {renderPageContent(num, newsDataset, onSelectArticle)}
+            </div>
+          ))}
         </div>
 
         {/* ========================================================= */}
@@ -746,7 +786,7 @@ function renderPageContent(
             <div className="flex items-center justify-between text-xs font-sans text-stone-700 px-2 mt-1 border-t border-stone-300 pt-1">
               <span className="font-bold text-red-800">हिन्दी संस्करण</span>
               <span className="font-bold">सच्ची निर्भीक और निष्पक्ष पत्रकारिता · दरभंगा डिजिटल नेटवर्क</span>
-              <span className="font-mono text-[11px] text-red-950 font-bold">{msmeReg}</span>
+              <span className="font-bold text-red-950 text-xs">दैनिक ब्रॉडशीट संस्करण (8 पृष्ठ)</span>
             </div>
 
             {/* Blue Dateline Bar */}

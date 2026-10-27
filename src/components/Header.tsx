@@ -107,12 +107,12 @@ export default function Header({
               className="h-12 w-12 xs:h-14 xs:w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-28 lg:w-28 object-contain shrink-0 transition-transform group-hover:scale-105 drop-shadow-xs"
             />
 
-            {/* चैनल का नाम एवं सबटाइटल - नाम ऊपर, सबटाइटल ठीक नीचे */}
-            <div className="flex flex-col justify-center text-left min-w-0">
-              <h1 className="text-xl xs:text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-serif leading-none whitespace-nowrap bg-gradient-to-r from-red-950 via-red-800 to-red-600 bg-clip-text text-transparent">
+            {/* चैनल का नाम एवं सबटाइटल - नाम ऊपर, सबटाइटल नाम के बिल्कुल सेंटर में */}
+            <div className="flex flex-col items-center justify-center text-center min-w-0">
+              <h1 className="text-xl xs:text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-serif leading-none whitespace-nowrap bg-gradient-to-r from-red-950 via-red-900 to-red-800 bg-clip-text text-transparent drop-shadow-xs">
                 DDN PRIME NEWS
               </h1>
-              <p className="text-[10px] xs:text-xs sm:text-base md:text-lg font-bold text-black tracking-wide mt-0.5 sm:mt-1.5 leading-tight whitespace-nowrap">
+              <p className="text-[10px] xs:text-xs sm:text-base md:text-lg font-bold text-black tracking-wide mt-0.5 sm:mt-1.5 leading-tight whitespace-nowrap text-center">
                 सच्ची निर्भीक और निष्पक्ष पत्रकारिता
               </p>
             </div>

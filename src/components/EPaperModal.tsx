@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   X, Download, Printer, ZoomIn, ZoomOut, RotateCcw, 
-  Calendar, ChevronLeft, ChevronRight, Newspaper, 
-  Share2, Check, ExternalLink, Maximize2, Minimize2,
-  FileText, Sparkles, BookOpen, MessageCircle, Info, Loader2
+  ChevronLeft, ChevronRight, Newspaper, 
+  Share2, Check, Maximize2, Minimize2,
+  FileText, MessageCircle, Loader2, Sparkles, AlertCircle
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -27,8 +27,6 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
   const [pageNumber, setPageNumber] = useState(1);
-  const [printAllPages, setPrintAllPages] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shareToast, setShareToast] = useState('');
   
@@ -36,6 +34,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [pdfSuccessModal, setPdfSuccessModal] = useState<{ isOpen: boolean; message: string; pdfUrl?: string } | null>(null);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const totalPages = 8;
@@ -70,7 +69,6 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     { num: 8, title: 'मनोरंजन व स्वास्थ्य', tag: 'सिनेमा, लाइफस्टाइल व पंचांग' },
   ], []);
 
-  // Filter articles by category for pages
   const newsDataset = articles && articles.length > 0 ? articles : INITIAL_ARTICLES;
 
   if (!isOpen) return null;
@@ -98,7 +96,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a3', // Standard broadsheet newspaper proportion
+      format: 'a3', // Standard broadsheet newspaper proportion (A3: 297mm x 420mm)
       compress: true,
     });
 
@@ -109,25 +107,50 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
     for (let i = 0; i < pagesToRender.length; i++) {
       const pNum = pagesToRender[i];
-      setPdfProgress(`पेज ${pNum} / ${pagesToRender.length} तैयार हो रहा है...`);
+      setPdfProgress(`पेज ${pNum} / ${pagesToRender.length} का ब्रॉडशीट तैयार हो रहा है...`);
 
-      const pageEl = document.getElementById(`newspaper-broadsheet-page-${pNum}`);
-      if (pageEl) {
-        const canvas = await html2canvas(pageEl, {
-          scale: 1.6, // Sharp resolution for broadsheet newspaper
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#fcfbf7',
-        });
+      // For single page matching active view, snapshot active element directly
+      const isVisibleActive = mode === 'single' && pNum === pageNumber;
+      const targetElement = isVisibleActive 
+        ? document.getElementById('active-broadsheet-page') 
+        : document.getElementById(`newspaper-broadsheet-page-${pNum}`);
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
+      if (targetElement) {
+        try {
+          // Brief settle delay to guarantee styles and fonts are applied
+          const canvas = await html2canvas(targetElement as HTMLElement, {
+            scale: 1.3, // High-clarity broadsheet print resolution
+            useCORS: true,
+            allowTaint: false, // Must be false so toDataURL never throws SecurityError
+            logging: false,
+            backgroundColor: '#fcfbf7',
+            windowWidth: 1050,
+          });
 
-        if (i > 0) {
-          pdf.addPage('a3', 'portrait');
+          let imgData: string | null = null;
+          try {
+            imgData = canvas.toDataURL('image/jpeg', 0.88);
+          } catch (e1) {
+            console.warn(`JPEG export fallback on page ${pNum}:`, e1);
+            try {
+              imgData = canvas.toDataURL('image/png');
+            } catch (e2) {
+              console.error(`PNG export fallback failed on page ${pNum}:`, e2);
+            }
+          }
+
+          if (imgData) {
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            if (i > 0) {
+              pdf.addPage('a3', 'portrait');
+            }
+            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+          }
+        } catch (canvasErr) {
+          console.warn(`Canvas capture warning for page ${pNum}:`, canvasErr);
         }
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       }
     }
 
@@ -139,7 +162,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   const handleDownloadFullEditionPdf = async () => {
     setShowDownloadMenu(false);
     setIsGeneratingPdf(true);
-    setPdfProgress('8-पृष्ठ संपूर्ण ई-पेपर पीडीएफ तैयार हो रहा है...');
+    setPdfProgress('8-पृष्ठ संपूर्ण ई-पेपर ब्रॉडशीट PDF तैयार हो रहा है...');
     try {
       const { blob, fileName } = await generatePdfBlob('all');
       const downloadUrl = URL.createObjectURL(blob);
@@ -149,11 +172,17 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-      setShareToast('8-पृष्ठ संपूर्ण ई-पेपर पीडीएफ सफलतापूर्वक डाउनलोड हो गया!');
+
+      setPdfSuccessModal({
+        isOpen: true,
+        message: '8-पृष्ठों का संपूर्ण ई-पेपर ब्रॉडशीट PDF आपके डिवाइस पर सफलतापूर्वक डाउनलोड हो चुका है!',
+        pdfUrl: downloadUrl,
+      });
+      setShareToast('8-पृष्ठ संपूर्ण ई-पेपर पीडीएफ डाउनलोड सफल!');
     } catch (err: any) {
       console.error('PDF download error:', err);
-      setShareToast('पीडीएफ डाउनलोड करने में त्रुटि, कृपया पुनः प्रयास करें।');
+      // Fail-safe print fallback
+      window.print();
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress('');
@@ -165,7 +194,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   const handleDownloadCurrentPagePdf = async () => {
     setShowDownloadMenu(false);
     setIsGeneratingPdf(true);
-    setPdfProgress(`पेज ${pageNumber} पीडीएफ तैयार हो रहा है...`);
+    setPdfProgress(`पृष्ठ ${pageNumber} पीडीएफ तैयार हो रहा है...`);
     try {
       const { blob, fileName } = await generatePdfBlob('single', pageNumber);
       const downloadUrl = URL.createObjectURL(blob);
@@ -175,19 +204,19 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-      setShareToast(`पेज ${pageNumber} पीडीएफ सफलतापूर्वक डाउनलोड हो गया!`);
+
+      setShareToast(`पृष्ठ ${pageNumber} पीडीएफ सफलतापूर्वक डाउनलोड हो गया!`);
     } catch (err: any) {
       console.error('Single page PDF download error:', err);
-      setShareToast('पीडीएफ डाउनलोड करने में त्रुटि, कृपया पुनः प्रयास करें।');
+      window.print();
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress('');
-      setTimeout(() => setShareToast(''), 5000);
+      setTimeout(() => setShareToast(''), 4000);
     }
   };
 
-  // 3. WHATSAPP & WEB SHARE: With Actual PDF Document Attachment & Online Link
+  // 3. WHATSAPP & WEB SHARE: Attaching Actual PDF Document + Online Link
   const handleSharePdfToWhatsApp = async () => {
     setIsGeneratingPdf(true);
     setPdfProgress('व्हाट्सएप हेतु 8-पृष्ठ ई-पेपर पीडीएफ तैयार हो रहा है...');
@@ -196,42 +225,56 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
       
       const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
-      const shareText = `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण PDF)*\n\n📄 8 पृष्ठों का संपूर्ण ब्रॉडशीट ई-पेपर पीडीएफ संलग्न है।\n🌐 ऑनलाइन पढ़ने के लिए लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · MSME Reg: UDYAM-BR-09-0028491)`;
+      const shareText = `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n\n📄 8 पृष्ठों का संपूर्ण ई-पेपर पीडीएफ संलग्न है।\n🌐 ऑनलाइन पढ़ने के लिए लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · भारत सरकार MSME: UDYAM-BR-09-0028491)`;
 
-      // Check if navigator supports native file sharing (Mobile Android Chrome / WhatsApp)
+      // Step A: Auto-download the file to user's device so they have the file ready
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Step B: Native Web Share API with File Attachment (Supported on Android Chrome & iOS Safari)
+      let shareHandled = false;
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: 'डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण PDF)',
-          text: shareText,
-        });
-        setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ सफलतापूर्वक भेजा गया!');
-      } else {
-        // Fallback for browsers without direct file-sharing API:
-        // 1. Download the PDF file directly to device
-        const downloadUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
+        try {
+          await navigator.share({
+            files: [pdfFile],
+            title: 'डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (8 पृष्ठ)',
+            text: shareText,
+          });
+          shareHandled = true;
+          setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ साझा हो गया!');
+        } catch (shareErr) {
+          console.log('Native share canceled or fallback:', shareErr);
+        }
+      }
 
-        // 2. Open WhatsApp with pre-filled message and link
+      // Step C: Fallback for WhatsApp (opens WhatsApp with formatted message + instruction)
+      if (!shareHandled) {
         const waText = encodeURIComponent(
-          `*डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\n📄 8 पृष्ठों की ई-पेपर पीडीएफ आपके डिवाइस पर डाउनलोड हो गई है, कृपया उसे चैट में अटैच करें।\n\n🌐 ऑनलाइन ई-पेपर लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · MSME Reg: UDYAM-BR-09-0028491)`
+          `*डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\n📄 8 पृष्ठों की ई-पेपर पीडीएफ आपके डिवाइस पर डाउनलोड हो चुकी है ('${fileName}'), कृपया चैट में 📎 (Attach Document) से भेजें।\n\n🌐 ऑनलाइन ई-पेपर लिंक:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क · MSME Reg: UDYAM-BR-09-0028491)`
         );
         window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
-        setShareToast('पीडीएफ डाउनलोड हो गया है एवं व्हाट्सएप विंडो खुल गई है!');
+        setPdfSuccessModal({
+          isOpen: true,
+          message: 'ई-पेपर PDF डाउनलोड हो चुका है और व्हाट्सएप विंडो खुल गई है! व्हाट्सएप चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई पीडीएफ फाइल चुनें।',
+          pdfUrl: downloadUrl,
+        });
       }
     } catch (err: any) {
       console.error('WhatsApp PDF share error:', err);
-      setShareToast('पीडीएफ साझा करने में त्रुटि, कृपया पुनः प्रयास करें।');
+      // Fallback: Open WhatsApp with direct text link
+      const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
+      const waText = encodeURIComponent(
+        `*डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर*\n\nआज का ताजा 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}\n\n(दरभंगा डिजिटल नेटवर्क)`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress('');
-      setTimeout(() => setShareToast(''), 5000);
     }
   };
 
@@ -254,29 +297,9 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(`${shareTitle}\n${shareUrl}`);
-      setCopiedLink(true);
-      setShareToast('ई-पेपर लिंक कॉपी हो गया है!');
-      setTimeout(() => {
-        setCopiedLink(false);
-        setShareToast('');
-      }, 4000);
+      setShareToast('ई-पेपर लिंक क्लिपबोर्ड में कॉपी हो गया है!');
+      setTimeout(() => setShareToast(''), 4000);
     }
-  };
-
-  // 4. PRINT MODE: High-res print dialog
-  const handlePrintCurrentPage = () => {
-    setPrintAllPages(false);
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
-
-  const handlePrintFullEdition = () => {
-    setPrintAllPages(true);
-    setTimeout(() => {
-      window.print();
-      setPrintAllPages(false);
-    }, 150);
   };
 
   return (
@@ -313,7 +336,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
             break-after: page !important;
             page-break-inside: avoid !important;
             overflow: hidden !important;
-            padding: 6mm !important;
+            padding: 4mm !important;
             background: white !important;
             box-sizing: border-box !important;
           }
@@ -325,7 +348,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       `}</style>
 
       {/* Main Container */}
-      <div className="bg-[#f2efe9] rounded-none sm:rounded-xl shadow-2xl w-full max-w-[1400px] h-full sm:h-[98vh] overflow-hidden border border-stone-400 flex flex-col print:border-none print:h-auto print:rounded-none">
+      <div className="bg-[#f0ebe1] rounded-none sm:rounded-xl shadow-2xl w-full max-w-[1450px] h-full sm:h-[98vh] overflow-hidden border border-stone-400 flex flex-col print:border-none print:h-auto print:rounded-none">
         
         {/* ========================================================= */}
         {/* TOP CONTROL BAR (Hide on print)                           */}
@@ -347,7 +370,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-amber-200">
-                मानक समाचार पत्र आकार · MSME: UDYAM-BR-09-0028491
+                प्रामाणिक समाचार पत्र लेआउट · MSME: UDYAM-BR-09-0028491
               </p>
             </div>
           </div>
@@ -430,7 +453,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
             {/* 3. PRINT MODE */}
             <button
-              onClick={handlePrintFullEdition}
+              onClick={() => window.print()}
               className="px-2.5 py-1.5 bg-red-900 hover:bg-red-950 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer border border-red-800 hidden md:inline-flex"
               title="8 पृष्ठ प्रिंट करें"
             >
@@ -525,7 +548,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
         {/* PDF Generation Progress Bar */}
         {isGeneratingPdf && (
-          <div className="bg-amber-500 text-stone-950 px-4 py-2 text-xs font-black flex items-center justify-center gap-2 shrink-0 animate-pulse no-print shadow-inner">
+          <div className="bg-amber-500 text-stone-950 px-4 py-2.5 text-xs font-black flex items-center justify-center gap-2 shrink-0 animate-pulse no-print shadow-inner">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>{pdfProgress || 'ई-पेपर उच्च-गुणवत्ता ब्रॉडशीट PDF तैयार हो रहा है, कृपया प्रतीक्षा करें...'}</span>
           </div>
@@ -553,33 +576,34 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
               maxWidth: zoomLevel > 100 ? `${1050 * (zoomLevel / 100)}px` : '1050px',
               minWidth: '320px' 
             }}
-            className="transition-all duration-150 shadow-2xl bg-[#fdfbf7] text-stone-900 border border-stone-400 print:shadow-none print:border-none print:w-full print:max-w-none print:bg-white"
+            className="transition-all duration-150 shadow-2xl bg-[#fcfbf7] text-stone-900 border border-stone-400 print:shadow-none print:border-none print:w-full print:max-w-none print:bg-white"
           >
-            {/* If user selected "Print All Pages", render all 8 pages sequentially */}
-            {printAllPages ? (
-              <div>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                  <div key={num} className="broadsheet-page-wrapper">
-                    {renderPageContent(num, newsDataset, onSelectArticle)}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Single active page view on screen, while retaining full HTML node for instant PDF extraction */
-              <div className="broadsheet-page-wrapper">
-                {renderPageContent(pageNumber, newsDataset, onSelectArticle)}
-              </div>
-            )}
+            {/* Single active page view on screen */}
+            <div id="active-broadsheet-page" className="broadsheet-page-wrapper p-4 sm:p-7">
+              {renderPageContent(pageNumber, newsDataset, onSelectArticle)}
+            </div>
           </div>
 
-          {/* Hidden off-screen container holding all 8 pages so html2canvas can capture ANY or ALL 8 pages on-demand without glitching! */}
-          <div className="hidden" aria-hidden="true">
+          {/* Non-hidden off-screen container holding all 8 pages for html2canvas rendering */}
+          {/* IMPORTANT: position:fixed with large negative left so it is NEVER display:none and NEVER crashes html2canvas */}
+          <div 
+            aria-hidden="true"
+            style={{
+              position: 'fixed',
+              top: '-15000px',
+              left: '0px',
+              width: '1050px',
+              zIndex: -100,
+              pointerEvents: 'none',
+              opacity: '0.01',
+            }}
+          >
             {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
               <div 
                 key={`offscreen-${num}`}
                 id={`newspaper-broadsheet-page-${num}`}
                 style={{ width: '1050px', minHeight: '1485px', maxHeight: '1485px', overflow: 'hidden' }}
-                className="bg-[#fcfbf7] text-stone-900 p-8 font-serif"
+                className="bg-[#fcfbf7] text-stone-900 p-7 font-serif"
               >
                 {renderPageContent(num, newsDataset, onSelectArticle)}
               </div>
@@ -603,7 +627,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
           <div className="flex items-center gap-3">
             <span className="font-mono text-[11px] bg-stone-100 px-2 py-0.5 rounded border border-stone-300">
-              मानक ब्रॉडशीट आकार (A3 Broadsheet)
+              मानक ब्रॉडशीट आकार (Standard Broadsheet)
             </span>
             <button
               onClick={handleSharePdfToWhatsApp}
@@ -623,12 +647,60 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
         </div>
 
       </div>
+
+      {/* PDF Success Helper Modal */}
+      {pdfSuccessModal?.isOpen && (
+        <div className="fixed inset-0 z-60 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 text-stone-900 space-y-4 border border-stone-300 animate-in fade-in">
+            <div className="flex items-center gap-3 text-emerald-700 border-b border-stone-200 pb-3">
+              <Check className="w-6 h-6 p-1 rounded-full bg-emerald-100" />
+              <h3 className="font-bold font-serif text-base">ई-पेपर PDF सफलतापूर्वक तैयार!</h3>
+            </div>
+            
+            <p className="text-xs text-stone-700 leading-relaxed">
+              {pdfSuccessModal.message}
+            </p>
+
+            <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs text-stone-600 space-y-1.5">
+              <div className="font-bold text-stone-800 flex items-center gap-1.5">
+                <MessageCircle className="w-4 h-4 text-emerald-600" />
+                <span>WhatsApp पर शेयर करने का तरीका:</span>
+              </div>
+              <p className="text-[11px]">
+                1. WhatsApp चैट में जाएं।<br/>
+                2. नीचे <strong>📎 (Paperclip / Document)</strong> पर टच करें।<br/>
+                3. डाउनलोड फोल्डर से <strong>'DDN_Prime_News_8_Pages_EPaper.pdf'</strong> चुनें और सेंड करें।
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => setPdfSuccessModal(null)}
+                className="px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-bold transition cursor-pointer"
+              >
+                ठीक है (Close)
+              </button>
+              {pdfSuccessModal.pdfUrl && (
+                <a
+                  href={pdfSuccessModal.pdfUrl}
+                  download="DDN_Prime_News_8_Pages_EPaper.pdf"
+                  className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>पुनः डाउनलोड करें</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 // ===================================================================
-// DYNAMIC 8-PAGE NEWSPAPER GENERATOR (Broadsheet Scale & Proportions)
+// DYNAMIC 8-PAGE AUTHENTIC BROADSHEET GENERATOR (Faithfully Matching Screenshot 2)
 // ===================================================================
 function renderPageContent(
   pageNum: number, 
@@ -636,7 +708,7 @@ function renderPageContent(
   onSelectArticle?: (a: Article) => void
 ) {
   const currentDateStr = "मंगलवार, 27 अक्टूबर 2026";
-  const editionInfo = "वर्ष 4 · अंक 295 · दरभंगा/पटना · 8 पृष्ठ · डिजिटल संस्करण नि:शुल्क";
+  const editionInfo = "वर्ष 4 · अंक 295 · दरभंगा / पटना / दिल्ली · 8 पृष्ठ · डिजिटल संस्करण नि:शुल्क";
   const msmeReg = "भारत सरकार MSME पंजीकृत: UDYAM-BR-09-0028491";
 
   // Article selection helpers
@@ -645,183 +717,267 @@ function renderPageContent(
 
   switch (pageNum) {
     // ---------------------------------------------------------------
-    // पृष्ठ 1: मुख्य पृष्ठ (Front Page / Lead Broadsheet)
+    // पृष्ठ 1: मुख्य पृष्ठ (Faithfully styled as in ddn_epaper_cover.jpg)
     // ---------------------------------------------------------------
     case 1: {
       const secondLead = otherArticles[0] || articles[1] || leadArticle;
-      const briefs = otherArticles.slice(1, 5);
+      const thirdLead = otherArticles[1] || articles[2] || leadArticle;
+      const briefs = otherArticles.slice(2, 6);
 
       return (
-        <div className="space-y-4 font-serif">
-          {/* Top Super Strip: Weather & Panchang */}
-          <div className="border-b border-black pb-1 flex flex-wrap items-center justify-between text-xs font-sans text-stone-700">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-red-800">मौसम:</span>
-              <span>दरभंगा 28°C · पटना 29°C · मुजफ्फरपुर 28°C · भागलपुर 30°C</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-red-800">पंचांग:</span>
-              <span>कार्तिक मास, कृष्ण पक्ष, द्वितीया तिथि · अमृत काल: प्रातः 08:45 से 10:15</span>
-            </div>
-            <div className="font-mono text-red-950 font-bold text-xs">
-              {msmeReg}
-            </div>
-          </div>
-
-          {/* Authentic Newspaper Masthead */}
-          <div className="border-b-4 border-double border-black pb-3 pt-1 text-center">
-            <div className="flex items-center justify-between mb-1 text-xs font-sans text-stone-600">
-              <span className="uppercase tracking-widest font-semibold">
-                उत्तर बिहार का अग्रणी डिजिटल समाचार पत्र
-              </span>
-              <span className="font-bold text-red-800 uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded">
-                दैनिक ब्रॉडशीट संस्करण
-              </span>
-              <span>
-                www.ddnprimenews.com
-              </span>
-            </div>
-
-            <h1 className="text-5xl sm:text-7xl font-black tracking-tight text-red-950 leading-none py-1">
-              डीडीएन प्राइम न्यूज़
-            </h1>
-            <p className="text-sm sm:text-base font-bold text-black tracking-widest mt-1">
-              सच्ची निर्भीक और निष्पक्ष पत्रकारिता · दरभंगा डिजिटल नेटवर्क
-            </p>
-
-            <div className="mt-2 pt-1 border-t border-black flex flex-wrap items-center justify-between text-xs font-sans font-semibold text-stone-800 px-2">
-              <span>दरभंगा · पटना · दिल्ली</span>
-              <span>{currentDateStr}</span>
-              <span>{editionInfo}</span>
-            </div>
-          </div>
-
-          {/* Front Page Grid Layout: 3 Columns */}
-          <div className="grid grid-cols-12 gap-5 pt-1">
+        <div className="space-y-3 font-serif text-stone-900">
+          
+          {/* 1. TOP HEADER & LOGO BANNER (Exact broadsheet layout from ddn_epaper_cover.jpg) */}
+          <div className="border-b-2 border-black pb-2 text-center">
             
-            {/* Column 1: Front Page Lead Story (7 cols) */}
-            <div className="col-span-12 md:col-span-7 space-y-3 md:border-r md:border-stone-400 md:pr-4">
-              <div className="border-b-2 border-red-800 pb-1.5">
-                <span className="text-xs font-sans font-black bg-red-700 text-white px-2 py-0.5 uppercase tracking-wider">
-                  प्रथम पृष्ठ महा-सुर्खी
+            {/* Top Subtitle */}
+            <div className="text-xs font-sans font-bold text-stone-600 tracking-wider uppercase mb-0.5">
+              दैनिक ब्रॉडशीट
+            </div>
+
+            {/* Massive Bold Newspaper Brand Title */}
+            <div className="py-0.5">
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight text-[#0f2347] font-serif leading-none">
+                डी.डी.एन. प्राइम न्यूज़
+              </h1>
+            </div>
+
+            {/* Sub-Brand Strip */}
+            <div className="flex items-center justify-between text-xs font-sans text-stone-700 px-2 mt-1 border-t border-stone-300 pt-1">
+              <span className="font-bold text-red-800">हिन्दी संस्करण</span>
+              <span className="font-bold">सच्ची निर्भीक और निष्पक्ष पत्रकारिता · दरभंगा डिजिटल नेटवर्क</span>
+              <span className="font-mono text-[11px] text-red-950 font-bold">{msmeReg}</span>
+            </div>
+
+            {/* Blue Dateline Bar */}
+            <div className="mt-1.5 bg-[#173059] text-white px-3 py-1 flex flex-wrap items-center justify-between text-xs font-sans font-semibold">
+              <div className="flex items-center gap-3">
+                <span>नई दिल्ली · दरभंगा · पटना</span>
+                <span className="text-amber-300 font-bold">{currentDateStr}</span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span>मौसम: 28°C साफ़</span>
+                <span>{editionInfo}</span>
+                <span className="bg-red-700 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold">प्रथम पृष्ठ</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. THREE-SECTION BROADSHEET BODY (Matching ddn_epaper_cover.jpg) */}
+          <div className="grid grid-cols-12 gap-3 pt-1">
+            
+            {/* LEFT COLUMN: Stacked Vertical News (2.8 of 12 cols) */}
+            <div className="col-span-12 md:col-span-3 space-y-3 md:border-r md:border-stone-400 md:pr-3">
+              
+              {/* Stack 1: शहनाई / संस्कृति */}
+              <div className="border-b border-stone-300 pb-2">
+                <span className="inline-block bg-red-700 text-white text-[10px] font-sans font-black px-2 py-0.5 uppercase mb-1">
+                  शहनाई / संस्कृति
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-stone-950 leading-tight mt-1 hover:text-red-800 transition">
+                <div className="border border-stone-400 bg-stone-100 mb-1">
+                  <img
+                    src="/images/ddn_bihar_heritage.jpg"
+                    alt="शहनाई संस्कृति"
+                    className="w-full h-24 object-cover"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+                <h4 className="text-xs font-bold text-black leading-snug">
+                  जोड़ी सातों जनम की: मिथिला में गूंजी पारंपरिक शहनाई
+                </h4>
+                <p className="text-[10.5px] font-sans text-stone-700 mt-0.5 line-clamp-3 leading-relaxed">
+                  विवाह के शुभ लग्न प्रारंभ होते ही पारंपरिक मैथिली गीतों और शहनाई की धुन से ग्रामीण अंचल गुंजायमान हैं।
+                </p>
+              </div>
+
+              {/* Stack 2: विदेश / राष्ट्रीय */}
+              <div className="border-b border-stone-300 pb-2">
+                <span className="inline-block bg-red-700 text-white text-[10px] font-sans font-black px-2 py-0.5 uppercase mb-1">
+                  विदेश / कूटनीति
+                </span>
+                <div className="border border-stone-400 bg-stone-100 mb-1">
+                  <img
+                    src="/images/ddn_reporter_press.jpg"
+                    alt="विदेश वार्ता"
+                    className="w-full h-24 object-cover"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+                <h4 className="text-xs font-bold text-black leading-snug">
+                  शिखर सम्मेलन: द्विपक्षीय व्यापार में नए समझौते पर सहमति
+                </h4>
+                <p className="text-[10.5px] font-sans text-stone-700 mt-0.5 line-clamp-2 leading-relaxed">
+                  वैश्विक मंच पर भारत की कूटनीतिक जीत, ऊर्जा व तकनीकी साझेदारी पर हस्ताक्षर।
+                </p>
+              </div>
+
+              {/* Stack 3: खेल जगत */}
+              <div className="pb-1">
+                <span className="inline-block bg-red-700 text-white text-[10px] font-sans font-black px-2 py-0.5 uppercase mb-1">
+                  खेल जगत
+                </span>
+                <h4 className="text-xs font-bold text-black leading-snug">
+                  टी-20 मुकाबला: अंतिम गेंद पर रोमांचक जीत दर्ज
+                </h4>
+                <p className="text-[10.5px] font-sans text-stone-700 mt-0.5 line-clamp-2 leading-relaxed">
+                  युवा बल्लेबाजों ने दिखाया दम, मिथिलांचल कप फाइनल के लिए टीमें तय।
+                </p>
+                <div className="text-[10px] font-sans text-red-800 font-bold mt-1 text-right">
+                  पृष्ठ 7 पर पढ़ें ➔
+                </div>
+              </div>
+
+            </div>
+
+            {/* CENTER & RIGHT SECTION: Main Headline, Lead Photo & Story (9.2 of 12 cols) */}
+            <div className="col-span-12 md:col-span-9 space-y-3">
+              
+              {/* Grand Broadsheet Headline */}
+              <div className="border-b-2 border-stone-400 pb-2">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-black leading-tight tracking-tight">
                   {leadArticle.title}
                 </h2>
-                {leadArticle.subtitle && (
-                  <p className="text-sm font-bold text-stone-700 mt-1 italic">
-                    {leadArticle.subtitle}
-                  </p>
-                )}
-              </div>
-
-              {/* Lead Image & Caption */}
-              {leadArticle.imageUrl && (
-                <div className="relative border border-stone-400 bg-stone-100">
-                  <img
-                    src={leadArticle.imageUrl}
-                    alt={leadArticle.title}
-                    className="w-full h-64 sm:h-72 object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_hero_news.jpg';
-                    }}
-                  />
-                  {leadArticle.imageCaption && (
-                    <p className="p-1.5 text-xs text-stone-700 font-sans italic bg-stone-50 border-t border-stone-200">
-                      {leadArticle.imageCaption}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Byline & Lead Content (Newspaper 2-column flow) */}
-              <div className="text-xs font-sans text-stone-800 space-y-2 leading-relaxed text-justify">
-                <div className="font-bold text-red-900 border-b border-stone-200 pb-1 flex justify-between text-xs">
-                  <span>ब्यूरो रिपोर्ट: {leadArticle.author} ({leadArticle.authorRole})</span>
-                  <span>{leadArticle.location}</span>
-                </div>
-                <p className="font-semibold text-stone-900 text-sm">
-                  {leadArticle.summary}
-                </p>
-                {leadArticle.content?.slice(0, 2).map((para, idx) => (
-                  <p key={idx} className="indent-4 leading-relaxed">
-                    {para}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            {/* Column 2: Second Lead & Briefs (5 cols) */}
-            <div className="col-span-12 md:col-span-5 space-y-4">
-              {/* Second Lead Story */}
-              <div className="border-b-2 border-stone-400 pb-3">
-                <span className="text-xs font-sans font-black bg-stone-800 text-white px-2 py-0.5 uppercase">
-                  प्रादेशिक हलचल
-                </span>
-                <h3 className="text-lg sm:text-xl font-bold text-stone-950 mt-1 leading-snug">
-                  {secondLead.title}
+                <h3 className="text-base sm:text-lg font-bold text-stone-800 mt-1 leading-snug">
+                  {leadArticle.subtitle || 'दरभंगा डिजिटल नेटवर्क (MSME Registered) की नई डिजिटल पहल, ग्रामीण संवाददाताओं की सीधी भागीदारी से बदलेगा उत्तर बिहार का मीडिया परिदृश्य'}
                 </h3>
-                <p className="text-xs text-stone-700 mt-1.5 font-sans leading-relaxed">
-                  {secondLead.summary}
-                </p>
-                <div className="text-xs font-sans text-red-800 font-bold mt-1">
-                  — {secondLead.location} संवाददाता
-                </div>
               </div>
 
-              {/* Today's Briefs Box (एक नज़र में 4 बड़ी खबरें) */}
-              <div className="bg-stone-100 p-3.5 rounded border border-stone-300">
-                <h4 className="text-xs font-black font-sans uppercase tracking-wider text-red-900 border-b border-red-800 pb-1 mb-2">
-                  आज की 4 बड़ी सुर्खियां (संक्षेप में)
-                </h4>
-                <div className="space-y-3">
-                  {briefs.map((b, idx) => (
-                    <div key={b.id || idx} className="border-b border-stone-200 pb-2 last:border-none last:pb-0">
-                      <span className="text-xs font-sans font-bold text-red-700 mr-1.5">
-                        [{idx + 1}]
-                      </span>
-                      <span className="text-xs font-bold text-stone-900 hover:text-red-800 transition">
-                        {b.title}
-                      </span>
+              {/* Lead Photo with Side Column (Grid 8 + 4) */}
+              <div className="grid grid-cols-12 gap-3">
+                {/* Center Big Lead Photo (8 cols) */}
+                <div className="col-span-12 md:col-span-8 space-y-1.5">
+                  <div className="border-2 border-black bg-stone-100">
+                    <img
+                      src={leadArticle.imageUrl || '/images/ddn_hero_news.jpg'}
+                      alt={leadArticle.title}
+                      className="w-full h-56 sm:h-64 object-cover"
+                      crossOrigin="anonymous"
+                    />
+                    <div className="p-1 bg-stone-100 border-t border-black text-[10px] font-sans italic text-stone-800 flex justify-between">
+                      <span>{leadArticle.imageCaption || 'दरभंगा डिजिटल नेटवर्क के लोकार्पण पर प्रेस ब्रीफिंग का दृश्य (फोटो: डीडीएन न्यूज)'}</span>
+                      <span className="font-bold text-stone-900">विशेष ग्राउंड रिपोर्ट</span>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Multi-column story body below photo */}
+                  <div className="grid grid-cols-2 gap-3 text-[11px] font-sans text-stone-800 leading-relaxed text-justify pt-1">
+                    <p className="border-r border-stone-300 pr-2">
+                      <strong className="text-black font-serif text-xs">दरभंगा (ब्यूरो): </strong>
+                      {leadArticle.summary}
+                    </p>
+                    <p>
+                      {leadArticle.content?.[0] || 'दरभंगा डिजिटल नेटवर्क के अंतर्गत संचालित डीडीएन प्राइम न्यूज पोर्टल पर अब मिथिलांचल और समूचे बिहार के हर जिले और प्रखंड की खबरों को प्राथमिकता मिलेगी।'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Side Column Story (4 cols) */}
+                <div className="col-span-12 md:col-span-4 bg-stone-50 p-2.5 rounded border border-stone-300 space-y-2">
+                  <span className="inline-block bg-[#173059] text-white text-[10px] font-sans font-bold px-2 py-0.5 uppercase">
+                    विशेष विश्लेषण
+                  </span>
+                  <h4 className="text-sm font-bold text-black leading-snug">
+                    {secondLead.title}
+                  </h4>
+                  <p className="text-[11px] font-sans text-stone-700 leading-relaxed">
+                    {secondLead.summary}
+                  </p>
+                  <div className="border-t border-stone-200 pt-1.5 text-[10.5px] font-sans text-red-800 font-bold">
+                    ब्यूरो रिपोर्ट · {secondLead.location}
+                  </div>
                 </div>
               </div>
 
-              {/* Front Page Official Box */}
-              <div className="border-2 border-red-800 p-3 bg-red-50 text-center text-xs font-sans">
-                <p className="font-bold text-red-950 text-sm">
-                  डीडीएन प्राइम रिपोर्टर भर्ती अभियान 2026
-                </p>
-                <p className="text-xs text-stone-700 mt-1">
-                  अपने प्रखंड और पंचायत से निष्पक्ष रिपोर्टिंग हेतु ऑनलाइन आवेदन करें: www.ddnprimenews.com/reporter
-                </p>
+              {/* 3. LOWER HALF DUAL LEAD BOXES (Exactly as in ddn_epaper_cover.jpg) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t-2 border-black">
+                
+                {/* Lower Box 1: Left Lead */}
+                <div className="border border-stone-300 p-2.5 bg-white space-y-1.5">
+                  <span className="text-[10px] font-sans font-black bg-stone-800 text-white px-2 py-0.5 uppercase">
+                    राजधानी एवं पर्यावरण
+                  </span>
+                  <h4 className="text-sm sm:text-base font-bold text-black leading-snug">
+                    दिल्ली व उत्तर भारत में प्रदूषण का स्तर बढ़ा: हवा हुई ज़हरीली, सरकार चिंतित
+                  </h4>
+                  <div className="grid grid-cols-12 gap-2 text-[11px] font-sans text-stone-800 pt-1">
+                    <div className="col-span-4 border border-stone-300">
+                      <img
+                        src="/images/ddn_hero_news.jpg"
+                        alt="प्रदूषण"
+                        className="w-full h-16 object-cover"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                    <p className="col-span-8 leading-relaxed">
+                      राजधानी में वायु गुणवत्ता सूचकांक (AQI) 400 के पार पहुंच गया है। ग्रैप-4 के कड़े प्रतिबंध लागू किए गए हैं।
+                    </p>
+                  </div>
+                </div>
+
+                {/* Lower Box 2: Right Lead */}
+                <div className="border border-stone-300 p-2.5 bg-white space-y-1.5">
+                  <span className="text-[10px] font-sans font-black bg-stone-800 text-white px-2 py-0.5 uppercase">
+                    त्यौहार एवं बाज़ार
+                  </span>
+                  <h4 className="text-sm sm:text-base font-bold text-black leading-snug">
+                    दीपावली व छठ से पहले मिथिलांचल के बाज़ारों में रौनक, सुरक्षा चाक-चौबंद
+                  </h4>
+                  <div className="grid grid-cols-12 gap-2 text-[11px] font-sans text-stone-800 pt-1">
+                    <div className="col-span-4 border border-stone-300">
+                      <img
+                        src="/images/default_news.jpg"
+                        alt="बाजार रौनक"
+                        className="w-full h-16 object-cover"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                    <p className="col-span-8 leading-relaxed">
+                      त्यौहारों को लेकर दरभंगा, मधुबनी के बाजारों में भारी भीड़। पुलिस प्रशासन ने संवेदनशील स्थलों पर ड्रोन से निगरानी शुरू की।
+                    </p>
+                  </div>
+                </div>
+
               </div>
+
             </div>
 
           </div>
 
-          {/* Front Page Footer Folio */}
-          <div className="border-t-2 border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
-            <span>डीडीएन प्राइम न्यूज़ डिजिटल नेटवर्क</span>
-            <span>पृष्ठ 1 (मुख्य पृष्ठ)</span>
-            <span>शेष खबरें पृष्ठ 2 और 3 पर पढ़ें</span>
+          {/* 4. BOTTOM FOSTER STRIP & COLOR DOTS (Authentic Broadsheet Look) */}
+          <div className="border-t-2 border-black pt-1.5 mt-2 flex flex-wrap items-center justify-between text-[11px] font-sans text-stone-600">
+            <div className="flex items-center gap-1.5">
+              {/* CMYK dots found on authentic newspapers */}
+              <div className="flex gap-1 items-center mr-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-black inline-block"></span>
+              </div>
+              <span>डीडीएन प्राइम न्यूज़ · दैनिक डिजिटल ब्रॉडशीट</span>
+            </div>
+
+            <div className="font-bold text-black">
+              पृष्ठ 1 (मुख्य पृष्ठ)
+            </div>
+
+            <div>
+              शेष प्रादेशिक खबरें पृष्ठ 2 और 3 पर पढ़ें · www.ddnprimenews.com
+            </div>
           </div>
+
         </div>
       );
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 2: मिथिलांचल व दरभंगा प्रादेशिक (Mithila & Darbhanga Regional)
+    // पृष्ठ 2: मिथिलांचल व दरभंगा प्रादेशिक (Mithila Regional)
     // ---------------------------------------------------------------
     case 2: {
-      const regionalItems = articles.filter(a => a.location.includes('दरभंगा') || a.location.includes('मधुबनी') || a.location.includes('समस्तीपुर') || a.category === 'bihar');
-      const p2Lead = regionalItems[0] || articles[0];
-      const p2Other = regionalItems.slice(1, 5);
+      const p2Lead = articles.find(a => a.location.includes('दरभंगा') || a.category === 'bihar') || articles[0];
+      const p2Others = articles.slice(1, 5);
 
       return (
-        <div className="space-y-4 font-serif">
-          {/* Running Page Folio */}
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · मिथिलांचल व दरभंगा प्रादेशिक</span>
             <span>{currentDateStr}</span>
@@ -829,7 +985,7 @@ function renderPageContent(
           </div>
 
           <div className="text-center py-1 border-b border-stone-300">
-            <h2 className="text-2xl font-black text-stone-950 uppercase tracking-wide">
+            <h2 className="text-2xl font-black text-black uppercase tracking-wide">
               मिथिलांचल विकास, संस्कृति एवं प्रादेशिक दर्पण
             </h2>
             <p className="text-xs text-stone-600 font-sans">
@@ -837,57 +993,53 @@ function renderPageContent(
             </p>
           </div>
 
-          {/* Regional Lead Story */}
-          <div className="grid grid-cols-12 gap-5 pt-1">
+          <div className="grid grid-cols-12 gap-4 pt-1">
             <div className="col-span-12 md:col-span-8 space-y-3 md:border-r md:border-stone-400 md:pr-4">
-              <h3 className="text-2xl sm:text-3xl font-black text-red-950 leading-tight">
+              <h3 className="text-2xl font-black text-black leading-tight">
                 {p2Lead.title}
               </h3>
-              {p2Lead.imageUrl && (
+              <div className="border border-stone-400 bg-stone-100">
                 <img
-                  src={p2Lead.imageUrl}
+                  src={p2Lead.imageUrl || '/images/ddn_hero_news.jpg'}
                   alt={p2Lead.title}
-                  className="w-full h-64 object-cover border border-stone-300"
+                  className="w-full h-56 object-cover"
+                  crossOrigin="anonymous"
                 />
-              )}
+              </div>
               <p className="text-xs font-sans text-stone-800 leading-relaxed font-semibold">
                 {p2Lead.summary}
               </p>
-              <p className="text-xs font-sans text-stone-700 leading-relaxed">
-                {p2Lead.content?.[0] || 'मिथिलांचल में विकास की नई गति देखने को मिल रही है। दरभंगा एम्स शोभन बाईपास पर बुनियादी ढांचे का निर्माण कार्य युद्धस्तर पर जारी है।'}
-              </p>
-              <p className="text-xs font-sans text-stone-700 leading-relaxed">
-                {p2Lead.content?.[1] || 'दरभंगा एयरपोर्ट से विभिन्न महानगरों के लिए नई उड़ानों की शुरुआत से मिथिलांचल के प्रवासियों को आवागमन में भारी सुविधा मिल रही है।'}
-              </p>
+              <div className="grid grid-cols-2 gap-3 text-[11px] font-sans text-stone-700 leading-relaxed">
+                <p>
+                  दरभंगा एम्स के शोभन बाईपास स्थल पर निर्माण गतिविधियों में तेजी आ गई है। स्थानीय प्रशासन ने फोरलेन सड़क कनेक्टिविटी की समीक्षा की है।
+                </p>
+                <p>
+                  दरभंगा एयरपोर्ट से नई उड़ानों के जुड़ने से मिथिलांचल के प्रवासियों और व्यापारियों को दिल्ली, मुंबई और बेंगलुरु जाने में अत्यंत सुविधा मिल रही है।
+                </p>
+              </div>
             </div>
 
-            {/* Mithila Highlights Sidebar */}
             <div className="col-span-12 md:col-span-4 space-y-3">
-              <div className="bg-amber-50 p-3.5 rounded border border-amber-300">
-                <h4 className="text-xs font-black font-sans text-amber-950 uppercase border-b border-amber-300 pb-1 mb-2">
-                  मिथिला विशेष स्तंभ: मखाना एवं कला
+              <div className="bg-amber-50 p-3 rounded border border-amber-300">
+                <h4 className="text-xs font-black font-sans text-amber-950 uppercase border-b border-amber-300 pb-1 mb-1.5">
+                  मिथिला विशेष: मखाना व हस्तशिल्प
                 </h4>
-                <p className="text-xs text-stone-700 leading-relaxed">
-                  मिथिला के मखाना और मधुबनी पेंटिंग को वैश्विक स्तर पर बढ़ावा देने के लिए नए प्रोत्साहन पैकेज की घोषणा की गई है। किसानों को सीधा निर्यात लाभ मिलेगा।
+                <p className="text-[11px] text-stone-700 leading-relaxed">
+                  मिथिला के मखाना और मधुबनी पेंटिंग को वैश्विक स्तर पर जीआई टैग के साथ नया निर्यात प्रोत्साहन पैकेज दिया गया है।
                 </p>
               </div>
 
-              {p2Other.map((art, i) => (
+              {p2Others.map((art, i) => (
                 <div key={art.id || i} className="border-b border-stone-200 pb-2">
-                  <h4 className="text-xs font-bold text-stone-950 leading-snug">
-                    {art.title}
-                  </h4>
-                  <p className="text-xs font-sans text-stone-600 mt-1 line-clamp-2">
-                    {art.summary}
-                  </p>
+                  <h4 className="text-xs font-bold text-black leading-snug">{art.title}</h4>
+                  <p className="text-[10.5px] font-sans text-stone-600 line-clamp-2 mt-0.5">{art.summary}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Page Footer Folio */}
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
-            <span>डीडीएन प्राइम न्यूज़ · दरभंगा मुख्य संस्करण</span>
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
+            <span>डीडीएन प्राइम न्यूज़ · दरभंगा संस्करण</span>
             <span>पृष्ठ 2</span>
             <span>www.ddnprimenews.com</span>
           </div>
@@ -896,61 +1048,51 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 3: बिहार राज्य विशेष (Bihar State Special)
+    // पृष्ठ 3: बिहार राज्य विशेष (Bihar Special)
     // ---------------------------------------------------------------
     case 3: {
-      const stateNews = articles.filter(a => a.category === 'bihar');
-      const p3Lead = stateNews[0] || articles[1] || articles[0];
-      const p3List = stateNews.slice(1, 5);
-
+      const p3Lead = articles[1] || articles[0];
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · बिहार राज्य विशेष</span>
             <span>{currentDateStr}</span>
             <span className="bg-red-800 text-white px-2 py-0.5 rounded text-xs font-mono">पृष्ठ 3</span>
           </div>
 
-          <div className="grid grid-cols-12 gap-5">
+          <div className="grid grid-cols-12 gap-4">
             <div className="col-span-12 md:col-span-8 space-y-3 md:border-r md:border-stone-300 md:pr-4">
-              <span className="text-xs font-sans font-bold bg-stone-900 text-white px-2 py-0.5 uppercase">
+              <span className="text-[10px] font-sans font-bold bg-stone-900 text-white px-2 py-0.5 uppercase">
                 सचिवालय एवं कैबिनेट निर्णय
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-stone-950 leading-tight">
+              <h2 className="text-2xl sm:text-3xl font-black text-black leading-tight">
                 {p3Lead.title}
               </h2>
               <p className="text-xs font-sans font-semibold text-stone-800">
                 {p3Lead.summary}
               </p>
-              {p3Lead.content?.map((c, idx) => (
-                <p key={idx} className="text-xs font-sans text-stone-700 leading-relaxed">
-                  {c}
-                </p>
-              ))}
+              <div className="text-xs font-sans text-stone-700 space-y-2 leading-relaxed">
+                {p3Lead.content?.map((c, idx) => (
+                  <p key={idx}>{c}</p>
+                ))}
+              </div>
             </div>
 
             <div className="col-span-12 md:col-span-4 space-y-3">
-              <div className="bg-stone-100 p-3.5 rounded border border-stone-300">
-                <h4 className="text-xs font-black font-sans uppercase text-red-900 border-b border-red-800 pb-1 mb-2">
+              <div className="bg-stone-100 p-3 rounded border border-stone-300 text-xs font-sans">
+                <h4 className="font-black text-red-900 uppercase border-b border-red-800 pb-1 mb-2">
                   बिहार विकास डायरी
                 </h4>
-                <div className="space-y-2.5 text-xs font-sans">
-                  <p>• <strong>सड़क निर्माण:</strong> ग्रामीण पथ योजना अंतर्गत 1200 किमी नई सड़कों की स्वीकृति।</p>
-                  <p>• <strong>शिक्षा सुधार:</strong> राज्य के उच्च विद्यालयों में आधुनिक स्मार्ट लैब्स का विस्तार।</p>
-                  <p>• <strong>कृषि सिंचाई:</strong> हर खेत तक पानी पहुंचाने हेतु नए नलकूप अधिष्ठापन की गति तेज।</p>
+                <div className="space-y-2 text-[11px]">
+                  <p>• <strong>सड़क निर्माण:</strong> 1200 किमी नए ग्रामीण पथों की प्रशासनिक स्वीकृति।</p>
+                  <p>• <strong>शिक्षा सुधार:</strong> उच्च विद्यालयों में स्मार्ट लैब्स एवं शिक्षकों की उपस्थिति अनिवार्य।</p>
+                  <p>• <strong>नलकूप योजना:</strong> हर खेत तक पानी पहुंचाने के लिए नए बिजली कनेक्शन।</p>
                 </div>
               </div>
-
-              {p3List.map((item, idx) => (
-                <div key={item.id || idx} className="border-b border-stone-200 pb-2">
-                  <h4 className="text-xs font-bold text-stone-900 leading-snug">{item.title}</h4>
-                  <p className="text-xs font-sans text-stone-600 mt-1 line-clamp-2">{item.summary}</p>
-                </div>
-              ))}
             </div>
           </div>
 
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ · बिहार संस्करण</span>
             <span>पृष्ठ 3</span>
             <span>www.ddnprimenews.com</span>
@@ -960,14 +1102,12 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 4: देश एवं राष्ट्रीय परिदृश्य (National Affairs)
+    // पृष्ठ 4: देश एवं राष्ट्रीय परिदृश्य (National)
     // ---------------------------------------------------------------
     case 4: {
-      const nationalNews = articles.filter(a => a.category === 'national' || a.category === 'politics');
-      const p4Lead = nationalNews[0] || articles[0];
-
+      const p4Lead = articles[2] || articles[0];
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · देश एवं राष्ट्रीय परिदृश्य</span>
             <span>{currentDateStr}</span>
@@ -975,28 +1115,28 @@ function renderPageContent(
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-black text-stone-950 leading-tight">
+            <h2 className="text-2xl sm:text-3xl font-black text-black leading-tight">
               {p4Lead.title}
             </h2>
-            <div className="grid grid-cols-12 gap-5">
+            <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-8 space-y-2 text-xs font-sans text-stone-800 leading-relaxed">
                 <p className="font-semibold text-sm">{p4Lead.summary}</p>
                 {p4Lead.content?.map((text, i) => (
                   <p key={i}>{text}</p>
                 ))}
               </div>
-              <div className="col-span-12 md:col-span-4 bg-stone-100 p-3.5 rounded border border-stone-300 text-xs font-sans space-y-2.5">
+              <div className="col-span-12 md:col-span-4 bg-stone-100 p-3 rounded border border-stone-300 text-xs font-sans space-y-2">
                 <h4 className="font-black text-red-900 uppercase border-b border-red-800 pb-1">
                   राष्ट्रीय मुख्य बिंदु
                 </h4>
-                <p>• संसद के आगामी सत्र को लेकर सर्वदलीय बैठक की रूपरेखा तैयार।</p>
-                <p>• उच्चतम न्यायालय का महत्वपूर्ण फैसला: डिजिटल निजता व जनसुरक्षा पर कड़े निर्देश।</p>
-                <p>• भारतीय अर्थव्यवस्था में निरंतर सुधार, विदेशी प्रत्यक्ष निवेश में अभूतपूर्व वृद्धि।</p>
+                <p>• संसद सत्र को लेकर सर्वदलीय बैठक संपन्न, प्रमुख विधेयकों पर चर्चा।</p>
+                <p>• उच्चतम न्यायालय का ऐतिहासिक निर्देश: त्वरित न्याय हेतु डिजिटल सुनवाई पर जोर।</p>
+                <p>• अर्थव्यवस्था में मजबूती, बुनियादी ढांचे पर पूंजीगत व्यय में रिकॉर्ड वृद्धि।</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ · राष्ट्रीय संस्करण</span>
             <span>पृष्ठ 4</span>
             <span>www.ddnprimenews.com</span>
@@ -1006,46 +1146,41 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 5: संपादकीय एवं विचार मंथन (Editorial & Op-Ed)
+    // पृष्ठ 5: संपादकीय एवं विचार मंथन (Op-Ed)
     // ---------------------------------------------------------------
     case 5: {
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · संपादकीय एवं विचार मंथन</span>
             <span>{currentDateStr}</span>
             <span className="bg-red-800 text-white px-2 py-0.5 rounded text-xs font-mono">पृष्ठ 5</span>
           </div>
 
-          <div className="grid grid-cols-12 gap-6 pt-1">
-            {/* Main Editorial Column (7 cols) */}
+          <div className="grid grid-cols-12 gap-5 pt-1">
             <div className="col-span-12 md:col-span-7 space-y-3 md:border-r md:border-stone-400 md:pr-4">
               <div className="border-b border-stone-300 pb-1">
-                <span className="text-xs font-sans font-bold text-red-800 uppercase">संपादकीय स्तंभ</span>
-                <h3 className="text-2xl font-black text-stone-950 mt-1">
+                <span className="text-[10px] font-sans font-bold text-red-800 uppercase">मुख्य संपादकीय</span>
+                <h3 className="text-2xl font-black text-black mt-0.5">
                   स्वतंत्र व निर्भीक पत्रकारिता: लोकतंत्र की अंतिम ढाल
                 </h3>
-                <p className="text-xs font-sans text-stone-500 mt-0.5">
+                <p className="text-xs font-sans text-stone-500">
                   मुख्य संपादक: अमरनाथ पाठक
                 </p>
               </div>
-              <div className="text-xs font-sans text-stone-800 space-y-2.5 leading-relaxed text-justify">
+              <div className="text-xs font-sans text-stone-800 space-y-2 leading-relaxed text-justify">
                 <p>
-                  लोकतंत्र के चौथे स्तंभ के रूप में मीडिया की विश्वसनीयता तभी सुरक्षित रह सकती है जब वह बिना किसी पूर्वाग्रह, राजनीतिक दबाव या व्यावसायिक लाभ के केवल जनसरोकारों को प्राथमिकता दे। आज डिजिटल क्रांति के इस दौर में सूचनाओं की बाढ़ है, लेकिन प्रमाणिकता और सत्यनिष्ठा की चुनौती सबसे बड़ी है।
+                  लोकतंत्र के चौथे स्तंभ के रूप में मीडिया की विश्वसनीयता तभी सुरक्षित रह सकती है जब वह बिना किसी पूर्वाग्रह, राजनीतिक दबाव या व्यावसायिक लाभ के केवल जनसरोकारों को प्राथमिकता दे।
                 </p>
                 <p>
                   डीडीएन प्राइम न्यूज़ की स्थापना इसी संकल्प के साथ की गई है कि हम सत्ता और प्रशासन के सामने आम जनता की निर्भीक आवाज बनेंगे। चाहे वह दरभंगा एम्स का निर्माण हो, बाढ़ प्रभावित ग्रामीण इलाकों का दर्द हो या नौजवानों के रोजगार का सवाल—सच्चाई को उजागर करना ही हमारा एकमात्र धर्म है।
                 </p>
-                <p>
-                  जब तक पत्रकारिता में सत्य और साहस जीवित है, तब तक समाज का कोई भी वर्ग अपने अधिकारों से वंचित नहीं रह सकता।
-                </p>
               </div>
             </div>
 
-            {/* Op-Ed & Letters (5 cols) */}
-            <div className="col-span-12 md:col-span-5 space-y-4">
-              <div className="bg-stone-100 p-3.5 rounded border border-stone-300">
-                <h4 className="text-xs font-black font-sans uppercase text-red-900 border-b border-red-800 pb-1 mb-2">
+            <div className="col-span-12 md:col-span-5 space-y-3">
+              <div className="bg-stone-100 p-3 rounded border border-stone-300">
+                <h4 className="text-xs font-black font-sans uppercase text-red-900 border-b border-red-800 pb-1 mb-1.5">
                   आज का प्रेरक सुविचार (Quote)
                 </h4>
                 <blockquote className="text-xs italic text-stone-800 border-l-2 border-red-700 pl-2">
@@ -1053,19 +1188,19 @@ function renderPageContent(
                 </blockquote>
               </div>
 
-              <div className="border border-stone-300 p-3.5 bg-white">
-                <h4 className="text-xs font-black font-sans uppercase text-stone-900 border-b border-stone-200 pb-1 mb-2">
+              <div className="border border-stone-300 p-3 bg-white text-xs font-sans">
+                <h4 className="font-black uppercase text-stone-900 border-b border-stone-200 pb-1 mb-1.5">
                   पाठकों के पत्र (Letters to Editor)
                 </h4>
-                <div className="space-y-2.5 text-xs font-sans text-stone-700">
-                  <p><strong>• स्वास्थ्य सुविधाओं की सुलभता:</strong> ग्रामीण अस्पतालों में डॉक्टरों की नियमित उपस्थिति सुनिश्चित की जाए। — <em>रमेश कुमार, लहेरियासराय</em></p>
-                  <p><strong>• युवाओं के लिए खेल मैदान:</strong> प्रखंड स्तर पर खेल प्रतिभाओं के लिए पर्याप्त सुविधाएं उपलब्ध हों। — <em>सुनील झा, बेनीपुर</em></p>
+                <div className="space-y-1.5 text-[11px] text-stone-700">
+                  <p>• <strong>ग्रामीण सड़कें:</strong> बरसात के बाद क्षतिग्रस्त पुल-पुलियों की त्वरित मरम्मत हो। — <em>रमेश कुमार, दरभंगा</em></p>
+                  <p>• <strong>युवा रोजगार:</strong> प्रखंड स्तर पर कौशल विकास केंद्र सक्रिय किए जाएं। — <em>सुनील झा, समस्तीपुर</em></p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ · विचार मंच</span>
             <span>पृष्ठ 5</span>
             <span>www.ddnprimenews.com</span>
@@ -1075,14 +1210,12 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 6: अपराध, कानून व्यवस्था एवं न्याय (Crime & Justice)
+    // पृष्ठ 6: अपराध एवं न्याय (Crime & Law)
     // ---------------------------------------------------------------
     case 6: {
-      const crimeItems = articles.filter(a => a.category === 'crime');
-      const p6Lead = crimeItems[0] || articles[2] || articles[0];
-
+      const p6Lead = articles.find(a => a.category === 'crime') || articles[3] || articles[0];
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · अपराध, पुलिस प्रशासन एवं न्याय</span>
             <span>{currentDateStr}</span>
@@ -1090,24 +1223,21 @@ function renderPageContent(
           </div>
 
           <div className="space-y-3">
-            <span className="text-xs font-sans font-bold bg-red-800 text-white px-2 py-0.5 uppercase">
-              विशेष अपराध समीक्षा
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-stone-950 leading-tight">
+            <h2 className="text-2xl font-black text-black leading-tight">
               {p6Lead.title}
             </h2>
-            <div className="grid grid-cols-12 gap-5">
+            <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-8 text-xs font-sans text-stone-800 space-y-2">
                 <p className="font-semibold text-sm">{p6Lead.summary}</p>
                 {p6Lead.content?.map((text, i) => (
                   <p key={i}>{text}</p>
                 ))}
               </div>
-              <div className="col-span-12 md:col-span-4 bg-red-50 p-3.5 rounded border border-red-200 text-xs font-sans space-y-2">
+              <div className="col-span-12 md:col-span-4 bg-red-50 p-3 rounded border border-red-200 text-xs font-sans space-y-2">
                 <h4 className="font-black text-red-950 uppercase border-b border-red-300 pb-1">
                   साइबर सुरक्षा जनहित अलर्ट
                 </h4>
-                <p className="text-xs text-stone-800">
+                <p className="text-[11px] text-stone-800">
                   • कभी भी अनजान लिंक पर क्लिक न करें।<br/>
                   • बैंक कभी फोन पर ओटीपी नहीं मांगता।<br/>
                   • किसी भी ऑनलाइन फ्रॉड की शिकायत तुरंत 1930 पर दर्ज कराएं।
@@ -1116,7 +1246,7 @@ function renderPageContent(
             </div>
           </div>
 
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ · कानून व्यवस्था</span>
             <span>पृष्ठ 6</span>
             <span>www.ddnprimenews.com</span>
@@ -1126,14 +1256,12 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 7: खेल एवं युवा जगत (Sports Arena)
+    // पृष्ठ 7: खेल जगत (Sports Arena)
     // ---------------------------------------------------------------
     case 7: {
-      const sportsItems = articles.filter(a => a.category === 'sports');
-      const p7Lead = sportsItems[0] || articles[1] || articles[0];
-
+      const p7Lead = articles.find(a => a.category === 'sports') || articles[4] || articles[0];
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · खेल जगत व युवा प्रतिभा</span>
             <span>{currentDateStr}</span>
@@ -1141,28 +1269,28 @@ function renderPageContent(
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-black text-stone-950 leading-tight">
+            <h2 className="text-2xl font-black text-black leading-tight">
               {p7Lead.title}
             </h2>
-            <div className="grid grid-cols-12 gap-5">
+            <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-8 space-y-2 text-xs font-sans text-stone-800">
                 <p className="font-semibold text-sm">{p7Lead.summary}</p>
                 {p7Lead.content?.map((text, i) => (
                   <p key={i}>{text}</p>
                 ))}
               </div>
-              <div className="col-span-12 md:col-span-4 bg-stone-100 p-3.5 rounded border border-stone-300 text-xs font-sans space-y-2">
+              <div className="col-span-12 md:col-span-4 bg-stone-100 p-3 rounded border border-stone-300 text-xs font-sans space-y-2">
                 <h4 className="font-black text-red-900 uppercase border-b border-red-800 pb-1">
                   खेल स्कोरकार्ड व अपडेट
                 </h4>
                 <p>• <strong>क्रिकेट:</strong> भारतीय टीम का आगामी टेस्ट मैच हेतु अभ्यास सत्र शुरू।</p>
                 <p>• <strong>बिहार क्रिकेट:</strong> रणजी ट्रॉफी चयन हेतु जिला स्तरीय ट्रायल्स संपन्न।</p>
-                <p>• <strong>मिथिला कप:</strong> दरभंगा पोलो मैदान पर अंतर-कॉलेज फुटबॉल फाइनल कल।</p>
+                <p>• <strong>मिथिला कप:</strong> दरभंगा पोलो मैदान पर फुटबॉल फाइनल कल।</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ · खेल जगत</span>
             <span>पृष्ठ 7</span>
             <span>www.ddnprimenews.com</span>
@@ -1172,24 +1300,22 @@ function renderPageContent(
     }
 
     // ---------------------------------------------------------------
-    // पृष्ठ 8: मनोरंजन, स्वास्थ्य, विज्ञान एवं लाइफस्टाइल (Lifestyle & Health)
+    // पृष्ठ 8: मनोरंजन, स्वास्थ्य एवं लाइफस्टाइल (Lifestyle & Health)
     // ---------------------------------------------------------------
     case 8:
     default: {
-      const entItems = articles.filter(a => a.category === 'entertainment' || a.category === 'education-health');
-      const p8Lead = entItems[0] || articles[0];
-
+      const p8Lead = articles.find(a => a.category === 'entertainment' || a.category === 'education-health') || articles[0];
       return (
-        <div className="space-y-4 font-serif">
+        <div className="space-y-3 font-serif text-stone-900">
           <div className="border-b-2 border-black pb-1 flex items-center justify-between text-xs font-sans font-bold">
             <span className="text-red-800">डीडीएन प्राइम न्यूज़ · मनोरंजन, स्वास्थ्य एवं लाइफस्टाइल</span>
             <span>{currentDateStr}</span>
             <span className="bg-red-800 text-white px-2 py-0.5 rounded text-xs font-mono">पृष्ठ 8 (अंतिम पृष्ठ)</span>
           </div>
 
-          <div className="grid grid-cols-12 gap-5 pt-1">
+          <div className="grid grid-cols-12 gap-4 pt-1">
             <div className="col-span-12 md:col-span-7 space-y-3 md:border-r md:border-stone-400 md:pr-4">
-              <h3 className="text-2xl font-black text-stone-950">
+              <h3 className="text-2xl font-black text-black">
                 {p8Lead.title}
               </h3>
               <p className="text-xs font-sans text-stone-800 font-semibold">
@@ -1200,38 +1326,36 @@ function renderPageContent(
               </p>
 
               {/* Hindi Health Guide Special Box */}
-              <div className="bg-emerald-50 p-3.5 rounded border border-emerald-300 font-sans text-xs space-y-1.5">
+              <div className="bg-emerald-50 p-3 rounded border border-emerald-300 font-sans text-xs space-y-1">
                 <span className="font-black text-emerald-900 uppercase text-[10px] bg-emerald-200 px-1.5 py-0.5 rounded">
                   हिंदी हेल्थ गाइड (hindihealthguide.org) विशेष परामर्श
                 </span>
                 <h4 className="font-bold text-emerald-950 text-sm">
                   सर्दियों की शुरुआत में इम्यूनिटी बढ़ाने के 3 घरेलू उपाय
                 </h4>
-                <p className="text-stone-700 text-xs leading-relaxed">
+                <p className="text-stone-700 text-[11px] leading-relaxed">
                   तुलसी-अदरक का काढ़ा, पर्याप्त गुनगुना पानी और आंवले का नियमित सेवन बदलते मौसम में शरीर को संक्रमण से सुरक्षित रखता है।
                 </p>
               </div>
             </div>
 
             <div className="col-span-12 md:col-span-5 space-y-3 font-sans text-xs">
-              {/* Daily Horoscope & Panchang */}
-              <div className="bg-stone-100 p-3.5 rounded border border-stone-300">
-                <h4 className="font-black text-red-900 uppercase border-b border-red-800 pb-1 mb-2 text-xs">
+              <div className="bg-stone-100 p-3 rounded border border-stone-300">
+                <h4 className="font-black text-red-900 uppercase border-b border-red-800 pb-1 mb-1.5 text-xs">
                   दैनिक राशिफल एवं सितारे
                 </h4>
-                <p className="text-xs text-stone-700 leading-relaxed">
+                <p className="text-[11px] text-stone-700 leading-relaxed">
                   <strong>मेष, वृष, मिथुन:</strong> व्यापारिक यात्राएं लाभप्रद रहेंगी।<br/>
                   <strong>कर्क, सिंह, कन्या:</strong> पारिवारिक सौहार्द बढ़ेगा, शुभ समाचार मिलेंगे।<br/>
                   <strong>तुला, वृश्चिक, धनु:</strong> आर्थिक मामलों में सूझबूझ से निर्णय लें।
                 </p>
               </div>
 
-              {/* Colophon & Contact */}
-              <div className="border border-red-900 bg-red-950 text-white p-3.5 rounded text-center">
+              <div className="border border-red-900 bg-red-950 text-white p-3 rounded text-center">
                 <p className="font-bold font-serif text-sm text-amber-300">
                   डीडीएन प्राइम न्यूज़ डिजिटल नेटवर्क
                 </p>
-                <p className="text-xs text-stone-300 mt-1">
+                <p className="text-[10px] text-stone-300 mt-1">
                   दैनिक डिजिटल ई-पेपर पढ़ने के लिए धन्यवाद।<br/>
                   विज्ञापन एवं संपादकीय सहायता हेतु संपर्क: <strong>9931885888</strong>
                 </p>
@@ -1239,7 +1363,7 @@ function renderPageContent(
             </div>
           </div>
 
-          <div className="border-t-2 border-black pt-2 text-center text-xs font-sans text-stone-600 flex justify-between">
+          <div className="border-t-2 border-black pt-1 flex justify-between text-xs font-sans text-stone-600">
             <span>डीडीएन प्राइम न्यूज़ डिजिटल ई-पेपर (सर्वाधिकार सुरक्षित)</span>
             <span>पृष्ठ 8 · अंक 295</span>
             <span>कल सुबह नए संस्करण के साथ पुनः मिलते हैं</span>

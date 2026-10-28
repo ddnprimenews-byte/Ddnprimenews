@@ -8,7 +8,8 @@ import {
   FileText, MessageCircle, Loader2, Sparkles, AlertCircle
 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
+import * as htmlToImage from 'html-to-image';
 import { Article } from '../types/news';
 import { INITIAL_ARTICLES } from '../data/newsData';
 
@@ -120,9 +121,15 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       await new Promise((resolve) => setTimeout(resolve, 380));
 
       const stageElement = document.getElementById('pdf-capture-stage');
-      if (stageElement) {
+      const screenElement = document.getElementById('active-broadsheet-page');
+      const targetEl = stageElement || screenElement;
+
+      if (targetEl) {
+        let imgData: string | null = null;
+
+        // Attempt 1: html2canvas-pro (full support for Tailwind v4 and modern CSS)
         try {
-          const canvas = await html2canvas(stageElement, {
+          const canvas = await html2canvas(targetEl, {
             scale: 1.25, // Crisp broadsheet print resolution
             useCORS: true,
             allowTaint: false,
@@ -130,39 +137,47 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
             windowWidth: 1050,
             scrollX: 0,
             scrollY: 0,
+            logging: false,
           });
-
-          let imgData: string | null = null;
-          try {
-            imgData = canvas.toDataURL('image/jpeg', 0.88);
-          } catch (e1) {
-            console.warn(`JPEG export fallback on page ${pNum}:`, e1);
-            try {
-              imgData = canvas.toDataURL('image/png');
-            } catch (e2) {
-              console.error(`PNG export fallback failed on page ${pNum}:`, e2);
-            }
-          }
-
-          if (imgData && imgData.length > 500) {
-            if (i > 0) {
-              pdf.addPage('a3', 'portrait');
-            }
-            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-          } else {
-            // Direct fail-safe fallback from screen element
-            const screenEl = document.getElementById('active-broadsheet-page');
-            if (screenEl) {
-              const c = await html2canvas(screenEl, { scale: 1.25, useCORS: true, allowTaint: false, backgroundColor: '#fcfbf7' });
-              const d = c.toDataURL('image/jpeg', 0.88);
-              if (d && d.length > 500) {
-                if (i > 0) pdf.addPage('a3', 'portrait');
-                pdf.addImage(d, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-              }
-            }
-          }
+          imgData = canvas.toDataURL('image/jpeg', 0.88);
         } catch (canvasErr) {
-          console.warn(`Canvas capture warning for page ${pNum}:`, canvasErr);
+          console.warn(`html2canvas-pro warning for page ${pNum}:`, canvasErr);
+        }
+
+        // Attempt 2: html-to-image (SVG foreignObject native browser rasterization)
+        if (!imgData || imgData.length < 1000) {
+          try {
+            imgData = await htmlToImage.toJpeg(targetEl, {
+              quality: 0.88,
+              backgroundColor: '#fcfbf7',
+              pixelRatio: 1.25,
+            });
+          } catch (h2iErr) {
+            console.warn(`html-to-image warning for page ${pNum}:`, h2iErr);
+          }
+        }
+
+        // Attempt 3: Direct capture of active on-screen element if needed
+        if ((!imgData || imgData.length < 1000) && screenElement) {
+          try {
+            imgData = await htmlToImage.toJpeg(screenElement, {
+              quality: 0.88,
+              backgroundColor: '#fcfbf7',
+              pixelRatio: 1.25,
+            });
+          } catch (e3) {
+            console.warn(`Screen element capture fallback warning on page ${pNum}:`, e3);
+          }
+        }
+
+        // Add page to PDF
+        if (imgData && imgData.length > 500) {
+          if (i > 0) {
+            pdf.addPage('a3', 'portrait');
+          }
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        } else {
+          console.error(`Page ${pNum} could not be rendered into image data`);
         }
       }
     }
@@ -171,9 +186,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     if (pdf.getNumberOfPages() === 0 || !pdf.internal.pages[1]) {
       const screenEl = document.getElementById('active-broadsheet-page');
       if (screenEl) {
-        const c = await html2canvas(screenEl, { scale: 1.25, useCORS: true, allowTaint: false, backgroundColor: '#fcfbf7' });
-        const d = c.toDataURL('image/jpeg', 0.88);
-        pdf.addImage(d, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        try {
+          const data = await htmlToImage.toJpeg(screenEl, { quality: 0.88, backgroundColor: '#fcfbf7' });
+          pdf.addImage(data, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        } catch (e) {
+          console.error('Final fail-safe capture error:', e);
+        }
       }
     }
 

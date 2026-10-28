@@ -11,18 +11,27 @@ export const metadata: Metadata = {
   generator: 'Next.js',
   keywords: ['DDN Prime News', 'Darbhanga News', 'Bihar News', 'हिंदी समाचार', 'दरभंगा डिजिटल नेटवर्क', 'डिजिटल ई-पेपर', 'Breaking News'],
   openGraph: {
-    title: 'DDN Prime News | दैनिक डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)',
-    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) एवं ताज़ा समाचार पढ़ें। दरभंगा डिजिटल नेटवर्क की निष्पक्ष पत्रकारिता।',
+    title: '📰 दैनिक डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट) | डीडीएन प्राइम न्यूज़',
+    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) ऑनलाइन पढ़ें एवं डाउनलोड करें। मुख्य समाचार, मिथिलांचल, बिहार, देश व संपादकीय।',
     url: 'https://ddnprimenews.com',
     siteName: 'DDN Prime News',
     locale: 'hi_IN',
     type: 'website',
+    images: [
+      {
+        url: '/images/ddn_epaper_cover.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'डीडीएन प्राइम न्यूज़ दैनिक डिजिटल ई-पेपर 8 पृष्ठ',
+      },
+    ],
   },
   manifest: '/manifest.json',
   twitter: {
     card: 'summary_large_image',
-    title: 'DDN Prime News | दैनिक डिजिटल ई-पेपर',
-    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) एवं ताज़ा समाचार पढ़ें।',
+    title: '📰 दैनिक डिजिटल ई-पेपर | डीडीएन प्राइम न्यूज़',
+    description: 'आज का दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट) ऑनलाइन पढ़ें एवं डाउनलोड करें।',
+    images: ['/images/ddn_epaper_cover.jpg'],
   },
 };
 

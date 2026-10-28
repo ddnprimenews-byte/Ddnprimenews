@@ -116,14 +116,14 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       setPdfProcessingPage(pNum);
       setPdfProgress(`पृष्ठ ${pNum} / ${pagesToRender.length} का ब्रॉडशीट तैयार हो रहा है...`);
 
-      // Allow React to re-render the capture stage and DOM to settle
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      // Generous delay to allow React state update, DOM layout, and font/image paint
+      await new Promise((resolve) => setTimeout(resolve, 380));
 
       const stageElement = document.getElementById('pdf-capture-stage');
       if (stageElement) {
         try {
           const canvas = await html2canvas(stageElement, {
-            scale: 1.25, // High crispness for text & photos
+            scale: 1.25, // Crisp broadsheet print resolution
             useCORS: true,
             allowTaint: false,
             backgroundColor: '#fcfbf7',
@@ -144,15 +144,36 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
             }
           }
 
-          if (imgData) {
+          if (imgData && imgData.length > 500) {
             if (i > 0) {
               pdf.addPage('a3', 'portrait');
             }
             pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+          } else {
+            // Direct fail-safe fallback from screen element
+            const screenEl = document.getElementById('active-broadsheet-page');
+            if (screenEl) {
+              const c = await html2canvas(screenEl, { scale: 1.25, useCORS: true, allowTaint: false, backgroundColor: '#fcfbf7' });
+              const d = c.toDataURL('image/jpeg', 0.88);
+              if (d && d.length > 500) {
+                if (i > 0) pdf.addPage('a3', 'portrait');
+                pdf.addImage(d, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+              }
+            }
           }
         } catch (canvasErr) {
           console.warn(`Canvas capture warning for page ${pNum}:`, canvasErr);
         }
+      }
+    }
+
+    // Fail-safe: If for any reason no pages were captured, snapshot active screen page
+    if (pdf.getNumberOfPages() === 0 || !pdf.internal.pages[1]) {
+      const screenEl = document.getElementById('active-broadsheet-page');
+      if (screenEl) {
+        const c = await html2canvas(screenEl, { scale: 1.25, useCORS: true, allowTaint: false, backgroundColor: '#fcfbf7' });
+        const d = c.toDataURL('image/jpeg', 0.88);
+        pdf.addImage(d, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       }
     }
 
@@ -235,7 +256,11 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       document.body.removeChild(a);
 
       const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
-      const cleanShareText = `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n\n📄 8 पृष्ठों का संपूर्ण ई-पेपर PDF संलग्न / उपलब्ध है।\n🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
+      const cleanShareText = `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n` +
+        `🚩 *डी.डी.एन. प्राइम न्यूज़ (दरभंगा डिजिटल नेटवर्क)*\n` +
+        `🗓️ *दिनांक: मंगलवार, 27 अक्टूबर 2026 · अंक 295*\n\n` +
+        `📄 8 पृष्ठों का संपूर्ण ई-पेपर PDF आपके डिवाइस में डाउनलोड हो चुका है ('${fileName}')।\n` +
+        `🌐 ऑनलाइन ई-पेपर यहाँ पढ़ें:\n${shareUrl}`;
 
       // Step B: Native Web Share API with File Attachment (Supported on Android Chrome & iOS Safari)
       let shareHandled = false;
@@ -243,7 +268,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
         try {
           await navigator.share({
             files: [pdfFile],
-            title: 'डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)',
+            title: '📰 दैनिक डिजिटल ई-पेपर | डीडीएन प्राइम न्यूज़ (8 पृष्ठ ब्रॉडशीट)',
             text: cleanShareText,
           });
           shareHandled = true;
@@ -255,15 +280,20 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
         }
       }
 
-      // Step C: Fallback for WhatsApp (opens WhatsApp with clean formatted message, NO MSME text)
+      // Step C: Fallback for WhatsApp (opens WhatsApp with full e-paper headline, NO MSME text)
       if (!shareHandled) {
         const waText = encodeURIComponent(
-          `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\n📄 8 पृष्ठों की ई-पेपर PDF ('${fileName}') आपके डिवाइस पर डाउनलोड हो चुकी है। कृपया इस चैट में 📎 (दस्तावेज़ / Document) पर क्लिक करके इसे भेजें।\n\n🌐 ऑनलाइन ई-पेपर लिंक:\n${shareUrl}`
+          `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n` +
+          `🚩 *डी.डी.एन. प्राइम न्यूज़ (दरभंगा डिजिटल नेटवर्क)*\n` +
+          `🗓️ *दिनांक: मंगलवार, 27 अक्टूबर 2026 · अंक 295*\n\n` +
+          `⭐ *मुख्य सुर्खियां:* दरभंगा में डिजिटल मीडिया विस्तार, मिथिलांचल धरोहर जीर्णोद्धार, शिक्षा व विकास डायरी, संपादकीय एवं खेल-युवा हलचल।\n\n` +
+          `📄 *8 पृष्ठों का संपूर्ण ई-पेपर PDF:* आपके डिवाइस में डाउनलोड हो चुका है ('${fileName}')। कृपया नीचे 📎 (दस्तावेज़ / Document) पर टच करके इसे भेजें।\n\n` +
+          `🌐 *डिजिटल ई-पेपर ऑनलाइन यहाँ पढ़ें:*\n${shareUrl}`
         );
         window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
         setPdfSuccessModal({
           isOpen: true,
-          message: `8 पृष्ठों का ई-पेपर PDF ('${fileName}') आपके डिवाइस में डाउनलोड हो चुका है और व्हाट्सएप विंडो खुल गई है! व्हाट्सएप चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई फाइल भेजें।`,
+          message: `8 पृष्ठों का संपूर्ण ई-पेपर PDF ('${fileName}') आपके डिवाइस में डाउनलोड हो चुका है और व्हाट्सएप चैट खुल गई है! चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई फाइल सेंड करें।`,
           pdfUrl: downloadUrl,
         });
       }
@@ -271,7 +301,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       console.error('WhatsApp PDF share error:', err);
       const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
       const waText = encodeURIComponent(
-        `📰 *डीडीएन प्राइम न्यूज़ - दैनिक डिजिटल ई-पेपर (8 पृष्ठ)*\n\nआज का ताज़ा 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}`
+        `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)*\n🚩 *डी.डी.एन. प्राइम न्यूज़*\n\nआज का संपूर्ण 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}`
       );
       window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
     } finally {
@@ -597,26 +627,25 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
         )}
 
         {/* DEDICATED VISIBLE CAPTURE STAGE FOR PDF GENERATION */}
-        {/* Rendered at full opacity and natural (0,0) coordinates for flawless html2canvas export */}
-        {isGeneratingPdf && (
-          <div
-            id="pdf-capture-stage"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '1050px',
-              minHeight: '1485px',
-              zIndex: 99990,
-              backgroundColor: '#fcfbf7',
-              pointerEvents: 'none',
-              overflow: 'visible',
-            }}
-            className="p-7 font-serif text-stone-900 shadow-none border-none"
-          >
-            {renderPageContent(pdfProcessingPage, newsDataset, onSelectArticle)}
-          </div>
-        )}
+        {/* Kept permanently mounted in the DOM so element is NEVER null and all fonts/images are already loaded */}
+        <div
+          id="pdf-capture-stage"
+          style={{
+            position: 'fixed',
+            top: isGeneratingPdf ? 0 : -99999,
+            left: isGeneratingPdf ? 0 : -99999,
+            width: '1050px',
+            minHeight: '1485px',
+            zIndex: isGeneratingPdf ? 99990 : -1000,
+            backgroundColor: '#fcfbf7',
+            pointerEvents: 'none',
+            opacity: isGeneratingPdf ? 1 : 0,
+            overflow: 'visible',
+          }}
+          className="p-7 font-serif text-stone-900 shadow-none border-none"
+        >
+          {renderPageContent(pdfProcessingPage, newsDataset, onSelectArticle)}
+        </div>
 
         {/* ========================================================= */}
         {/* BROADSHEET CANVAS VIEWPORT (Screen View)                  */}
@@ -713,22 +742,33 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-1">
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
               <button
                 onClick={() => setPdfSuccessModal(null)}
-                className="px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-bold transition cursor-pointer"
+                className="px-3.5 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-bold transition cursor-pointer"
               >
                 ठीक है (Close)
               </button>
               {pdfSuccessModal.pdfUrl && (
-                <a
-                  href={pdfSuccessModal.pdfUrl}
-                  download="DDN_Prime_News_8_Pages_EPaper.pdf"
-                  className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>पुनः डाउनलोड करें</span>
-                </a>
+                <>
+                  <a
+                    href={pdfSuccessModal.pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-300" />
+                    <span>PDF अभी देखें</span>
+                  </a>
+                  <a
+                    href={pdfSuccessModal.pdfUrl}
+                    download="DDN_Prime_News_8_Pages_EPaper.pdf"
+                    className="px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>पुनः डाउनलोड करें</span>
+                  </a>
+                </>
               )}
             </div>
           </div>

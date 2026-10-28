@@ -38,6 +38,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [pdfSuccessModal, setPdfSuccessModal] = useState<{ isOpen: boolean; message: string; pdfUrl?: string } | null>(null);
+  const [whatsappShareData, setWhatsappShareData] = useState<{
+    file: File;
+    fileName: string;
+    pdfUrl: string;
+  } | null>(null);
+  const [showDirectWhatsAppDialog, setShowDirectWhatsAppDialog] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const totalPages = 8;
@@ -256,7 +262,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     }
   };
 
-  // 3. WHATSAPP & WEB SHARE: Attaching Actual PDF Document + Clean Links (NO MSME NUMBER)
+  // 3. WHATSAPP DIRECT SHARE: Attaches Actual PDF Document + Clean Headline (NO MSME NUMBER)
   const handleSharePdfToWhatsApp = async () => {
     setIsGeneratingPdf(true);
     setPdfProgress('व्हाट्सएप हेतु 8-पृष्ठ ई-पेपर पीडीएफ तैयार हो रहा है...');
@@ -264,94 +270,75 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
       const { blob, fileName } = await generatePdfBlob('all');
       const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
       const downloadUrl = URL.createObjectURL(blob);
-      
-      // Step A: Auto-download the file to user's device so they have the file ready
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+
+      setWhatsappShareData({
+        file: pdfFile,
+        fileName,
+        pdfUrl: downloadUrl,
+      });
 
       const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
-      const cleanShareText = `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n` +
-        `🚩 *डी.डी.एन. प्राइम न्यूज़ (दरभंगा डिजिटल नेटवर्क)*\n` +
-        `🗓️ *दिनांक: मंगलवार, 27 अक्टूबर 2026 · अंक 295*\n\n` +
-        `📄 8 पृष्ठों का संपूर्ण ई-पेपर PDF आपके डिवाइस में डाउनलोड हो चुका है ('${fileName}')।\n` +
-        `🌐 ऑनलाइन ई-पेपर यहाँ पढ़ें:\n${shareUrl}`;
+      const cleanShareText = `📰 *दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़*\n` +
+        `📍 दरभंगा, मिथिलांचल एवं बिहार\n` +
+        `🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
 
-      // Step B: Native Web Share API with File Attachment (Supported on Android Chrome & iOS Safari)
-      let shareHandled = false;
+      // Check if native Web Share with attached PDF file can be triggered right away
+      let sharedSuccessfully = false;
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         try {
           await navigator.share({
             files: [pdfFile],
-            title: '📰 दैनिक डिजिटल ई-पेपर | डीडीएन प्राइम न्यूज़ (8 पृष्ठ ब्रॉडशीट)',
+            title: 'दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़',
             text: cleanShareText,
           });
-          shareHandled = true;
+          sharedSuccessfully = true;
           setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ साझा हो गया!');
         } catch (shareErr: any) {
-          if (shareErr.name !== 'AbortError') {
-            console.log('Native share fallback:', shareErr);
+          if (shareErr.name === 'AbortError') {
+            return;
           }
         }
       }
 
-      // Step C: Fallback for WhatsApp (opens WhatsApp with full e-paper headline, NO MSME text)
-      if (!shareHandled) {
-        const waText = encodeURIComponent(
-          `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ संपूर्ण ब्रॉडशीट)*\n` +
-          `🚩 *डी.डी.एन. प्राइम न्यूज़ (दरभंगा डिजिटल नेटवर्क)*\n` +
-          `🗓️ *दिनांक: मंगलवार, 27 अक्टूबर 2026 · अंक 295*\n\n` +
-          `⭐ *मुख्य सुर्खियां:* दरभंगा में डिजिटल मीडिया विस्तार, मिथिलांचल धरोहर जीर्णोद्धार, शिक्षा व विकास डायरी, संपादकीय एवं खेल-युवा हलचल।\n\n` +
-          `📄 *8 पृष्ठों का संपूर्ण ई-पेपर PDF:* आपके डिवाइस में डाउनलोड हो चुका है ('${fileName}')। कृपया नीचे 📎 (दस्तावेज़ / Document) पर टच करके इसे भेजें।\n\n` +
-          `🌐 *डिजिटल ई-पेपर ऑनलाइन यहाँ पढ़ें:*\n${shareUrl}`
-        );
-        window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
-        setPdfSuccessModal({
-          isOpen: true,
-          message: `8 पृष्ठों का संपूर्ण ई-पेपर PDF ('${fileName}') आपके डिवाइस में डाउनलोड हो चुका है और व्हाट्सएप चैट खुल गई है! चैट में 📎 (Paperclip / Document) पर क्लिक करके डाउनलोड की गई फाइल सेंड करें।`,
-          pdfUrl: downloadUrl,
-        });
+      // If user activation gesture expired during PDF generation or file share needs 0ms touch:
+      if (!sharedSuccessfully) {
+        setShowDirectWhatsAppDialog(true);
       }
     } catch (err: any) {
       console.error('WhatsApp PDF share error:', err);
-      const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
-      const waText = encodeURIComponent(
-        `📰 *दैनिक डिजिटल ई-पेपर (8 पृष्ठ ब्रॉडशीट)*\n🚩 *डी.डी.एन. प्राइम न्यूज़*\n\nआज का संपूर्ण 8 पृष्ठों का ई-पेपर ऑनलाइन पढ़ें:\n${shareUrl}`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
+      setShareToast('पीडीएफ तैयार करने में समस्या आई, कृपया पुनः प्रयास करें।');
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress('');
     }
   };
 
-  // Standard Web Share Link Fallback (NO MSME text)
+  // Standard Web Share Link Fallback (Strictly Headline, Address & Link - NO MSME)
   const handleShareLink = async () => {
     const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper&page=${pageNumber}` : 'https://ddnprimenews.com';
-    const shareTitle = `डीडीएन प्राइम न्यूज़ - डिजिटल ई-पेपर (पृष्ठ ${pageNumber}: ${pageMeta[pageNumber - 1]?.title})`;
-    const shareText = `दैनिक डिजिटल ई-पेपर (8 पृष्ठों का संपूर्ण ब्रॉडशीट संस्करण)। आज ही ऑनलाइन पढ़ें:`;
+    const shareTitle = `दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़ (पृष्ठ ${pageNumber}: ${pageMeta[pageNumber - 1]?.title})`;
+    const cleanShareText = `📰 *दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़*\n` +
+      `📍 दरभंगा, मिथिलांचल एवं बिहार\n` +
+      `🌐 पृष्ठ ${pageNumber} ऑनलाइन पढ़ने हेतु लिंक:\n${shareUrl}`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
           title: shareTitle,
-          text: shareText,
+          text: cleanShareText,
           url: shareUrl,
         });
       } catch (err) {
         // User canceled share
       }
     } else {
-      navigator.clipboard?.writeText(shareUrl);
+      navigator.clipboard?.writeText(cleanShareText);
       setShareToast('ई-पेपर लिंक कॉपी हो गया!');
       setTimeout(() => setShareToast(''), 3000);
     }
   };
 
-  // Clean Print Handler
+  // Clean Print Handler: Uses isolated @media print rules in globals.css
   const handlePrint = () => {
     window.print();
   };
@@ -359,48 +346,9 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
   return (
     <div 
       ref={modalRef}
+      id="epaper-modal-root"
       className="fixed inset-0 z-50 overflow-hidden bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-0 sm:p-2 font-sans select-none print:p-0 print:bg-white print:fixed-none"
     >
-      {/* Newspaper Broadsheet Print Styles */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #newspaper-print-area, #newspaper-print-area * {
-            visibility: visible;
-          }
-          #newspaper-print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .broadsheet-page-wrapper {
-            width: 100% !important;
-            height: 100vh !important;
-            max-height: 100vh !important;
-            page-break-after: always !important;
-            break-after: page !important;
-            page-break-inside: avoid !important;
-            overflow: hidden !important;
-            padding: 4mm !important;
-            background: white !important;
-            box-sizing: border-box !important;
-          }
-          @page {
-            size: A3 portrait;
-            margin: 0;
-          }
-        }
-      `}</style>
-
       {/* Main Container */}
       <div className="bg-[#f0ebe1] rounded-none sm:rounded-xl shadow-2xl w-full max-w-[1450px] h-full sm:h-[98vh] overflow-hidden border border-stone-400 flex flex-col print:border-none print:h-auto print:rounded-none">
         
@@ -690,7 +638,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
         </div>
 
         {/* PRINT CONTAINER: All 8 pages rendered for window.print() */}
-        <div className="hidden print:block epaper-print-container">
+        <div id="epaper-print-container" className="hidden print:block epaper-print-container w-full bg-white">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
             <div key={`print-page-${num}`} className="epaper-sheet-page p-6 bg-white text-stone-900 font-serif">
               {renderPageContent(num, newsDataset, onSelectArticle)}
@@ -735,30 +683,106 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
 
       </div>
 
-      {/* PDF Success Helper Modal */}
+      {/* DIRECT WHATSAPP SHARE DIALOG (Fresh Synchronous User Gesture with Attached PDF) */}
+      {showDirectWhatsAppDialog && whatsappShareData && (
+        <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 no-print animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-stone-900 space-y-4 border border-stone-200">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <MessageCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-black font-serif text-stone-900">
+                ई-पेपर 8 पृष्ठ PDF तैयार है!
+              </h3>
+              <p className="text-xs text-stone-600 font-sans">
+                व्हाट्सएप पर सीधे पीडीएफ फाइल और मुख्य हेडिंग भेजने हेतु नीचे बटन दबाएं:
+              </p>
+            </div>
+
+            {/* Clean summary preview strictly matching user format */}
+            <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs space-y-1 text-stone-700 font-sans">
+              <div className="font-bold text-stone-900 text-sm">📰 दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़</div>
+              <div className="text-stone-600">📍 दरभंगा, मिथिलांचल एवं बिहार</div>
+              <div className="text-emerald-700 font-mono text-[11px] font-semibold pt-1 flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5" />
+                <span>{whatsappShareData.fileName} (संपूर्ण 8 पृष्ठ ब्रॉडशीट PDF)</span>
+              </div>
+            </div>
+
+            {/* 1-TAP INSTANT ACTION BUTTON - 0ms GESTURE TO ATTACH PDF DIRECTLY */}
+            <button
+              onClick={async () => {
+                const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
+                const cleanShareText = `📰 *दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़*\n` +
+                  `📍 दरभंगा, मिथिलांचल एवं बिहार\n` +
+                  `🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
+
+                if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [whatsappShareData.file] })) {
+                  try {
+                    await navigator.share({
+                      files: [whatsappShareData.file],
+                      title: 'दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़',
+                      text: cleanShareText,
+                    });
+                    setShowDirectWhatsAppDialog(false);
+                    setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ भेज दिया गया!');
+                    return;
+                  } catch (e: any) {
+                    if (e.name === 'AbortError') return;
+                  }
+                }
+
+                // Fallback for devices without File share capability
+                const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(cleanShareText)}`;
+                window.open(waUrl, '_blank');
+                setShowDirectWhatsAppDialog(false);
+              }}
+              className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#1faa50] text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm shadow-md transition cursor-pointer active:scale-98"
+            >
+              <MessageCircle className="w-5 h-5 fill-current" />
+              <span>WhatsApp पर सीधे PDF भेजें ➔</span>
+            </button>
+
+            {/* Optional download only if requested */}
+            <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-xs">
+              <button
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = whatsappShareData.pdfUrl;
+                  a.download = whatsappShareData.fileName;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  setShareToast('पीडीएफ डिवाइस में डाउनलोड हो गई!');
+                }}
+                className="text-stone-500 hover:text-stone-800 text-[11px] underline cursor-pointer"
+              >
+                डिवाइस में भी सेव करें
+              </button>
+
+              <button
+                onClick={() => setShowDirectWhatsAppDialog(false)}
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Download Success Modal */}
       {pdfSuccessModal?.isOpen && (
         <div className="fixed inset-0 z-60 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 text-stone-900 space-y-4 border border-stone-300 animate-in fade-in">
             <div className="flex items-center gap-3 text-emerald-700 border-b border-stone-200 pb-3">
               <Check className="w-6 h-6 p-1 rounded-full bg-emerald-100" />
-              <h3 className="font-bold font-serif text-base">ई-पेपर PDF सफलतापूर्वक तैयार!</h3>
+              <h3 className="font-bold font-serif text-base">ई-पेपर PDF डाउनलोड सफल!</h3>
             </div>
             
-            <p className="text-xs text-stone-700 leading-relaxed">
+            <p className="text-xs text-stone-700 leading-relaxed font-sans">
               {pdfSuccessModal.message}
             </p>
-
-            <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs text-stone-600 space-y-1.5">
-              <div className="font-bold text-stone-800 flex items-center gap-1.5">
-                <MessageCircle className="w-4 h-4 text-emerald-600" />
-                <span>WhatsApp पर शेयर करने का तरीका:</span>
-              </div>
-              <p className="text-[11px]">
-                1. WhatsApp चैट में जाएं।<br/>
-                2. नीचे <strong>📎 (Paperclip / Document)</strong> पर टच करें।<br/>
-                3. डाउनलोड फोल्डर से <strong>'DDN_Prime_News_8_Pages_EPaper.pdf'</strong> चुनें और सेंड करें।
-              </p>
-            </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
               <button
@@ -768,25 +792,15 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
                 ठीक है (Close)
               </button>
               {pdfSuccessModal.pdfUrl && (
-                <>
-                  <a
-                    href={pdfSuccessModal.pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-amber-300" />
-                    <span>PDF अभी देखें</span>
-                  </a>
-                  <a
-                    href={pdfSuccessModal.pdfUrl}
-                    download="DDN_Prime_News_8_Pages_EPaper.pdf"
-                    className="px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>पुनः डाउनलोड करें</span>
-                  </a>
-                </>
+                <a
+                  href={pdfSuccessModal.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-300" />
+                  <span>PDF अभी देखें</span>
+                </a>
               )}
             </div>
           </div>

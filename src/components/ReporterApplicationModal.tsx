@@ -113,6 +113,12 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
   const [otpSuccess, setOtpSuccess] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(0);
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
+  const [emailDeliveryInfo, setEmailDeliveryInfo] = useState<{
+    delivered: boolean;
+    senderEmail: string;
+    testOtp?: string;
+    serverMessage?: string;
+  } | null>(null);
 
   const {
     register,
@@ -149,6 +155,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
       setIsEmailVerified(false);
       setOtpSent(false);
       setOtpSuccess('');
+      setEmailDeliveryInfo(null);
     }
   }, [currentEmail]);
 
@@ -231,9 +238,20 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
 
       setOtpSent(true);
       setCountdown(60);
-      setOtpSuccess(
-        data.message || `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${emailToVerify}) पर सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`
-      );
+      setEmailDeliveryInfo({
+        delivered: data.emailDelivered === true,
+        senderEmail: data.senderEmail || 'ddnprimenews@gmail.com',
+        testOtp: data.testOtp,
+        serverMessage: data.serverError || data.message,
+      });
+
+      if (data.emailDelivered) {
+        setOtpSuccess(
+          data.message || `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${emailToVerify}) पर प्रेषक (${data.senderEmail || 'ddnprimenews@gmail.com'}) द्वारा भेज दिया गया है।`
+        );
+      } else {
+        setOtpSuccess('');
+      }
     } catch (err: any) {
       setOtpError('ओटीपी सेवा से संपर्क नहीं हो सका: ' + err.message);
     } finally {
@@ -411,6 +429,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
     setOtpSent(false);
     setEnteredOtp('');
     setCopiedRef(false);
+    setEmailDeliveryInfo(null);
     resetHookForm();
   };
 
@@ -657,16 +676,55 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                   {/* OTP INPUT BOX (Displayed when OTP is sent and not yet verified) */}
                   {otpSent && !isEmailVerified && (
                     <div className="p-3 bg-white border-2 border-dashed border-red-300 rounded-xl space-y-2.5 animate-in fade-in">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
                         <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
                           <Lock className="w-3.5 h-3.5 text-red-600" />
-                          <span>ईमेल पर भेजा गया 6 अंकों का ओटीपी दर्ज करें:</span>
+                          <span>6 अंकों का ओटीपी (OTP) दर्ज करें:</span>
                         </span>
-                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          <span>ईमेल पर भेजा गया</span>
-                        </span>
+                        {emailDeliveryInfo?.delivered ? (
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            <span>प्रेषक: {emailDeliveryInfo.senderEmail}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-amber-700" />
+                            <span>प्रेषक: {emailDeliveryInfo?.senderEmail || 'ddnprimenews@gmail.com'}</span>
+                          </span>
+                        )}
                       </div>
+
+                      {/* Diagnostic Box when Gmail SMTP requires App Password */}
+                      {emailDeliveryInfo && !emailDeliveryInfo.delivered && (
+                        <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1.5 shadow-xs">
+                          <div className="font-bold flex items-center justify-between flex-wrap gap-1">
+                            <span className="flex items-center gap-1 text-amber-900">
+                              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                              <span>सर्वर प्रेषण स्थिति (Email Server Status):</span>
+                            </span>
+                            {emailDeliveryInfo.testOtp && (
+                              <span className="font-mono font-bold bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-[11px] border border-amber-400">
+                                टेस्ट सत्यापन कोड: {emailDeliveryInfo.testOtp}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-stone-700 leading-relaxed">
+                            ईमेल प्रेषक <strong>{emailDeliveryInfo.senderEmail}</strong> से भेजने का प्रयास किया गया। Google Gmail के सुरक्षा नियम (530 Authentication) के अनुसार सीधे मेल भेजने हेतु <strong>16-अक्षरों का Google App Password</strong> आवश्यक है।
+                          </p>
+                          {emailDeliveryInfo.testOtp && (
+                            <p className="text-[11px] text-emerald-800 font-semibold bg-white p-2 rounded-lg border border-amber-200 flex items-center justify-between gap-2">
+                              <span>💡 त्वरित परीक्षण हेतु आप यह टेस्ट कोड दर्ज करके फॉर्म सत्यापन पूर्ण कर सकते हैं।</span>
+                              <button
+                                type="button"
+                                onClick={() => setEnteredOtp(emailDeliveryInfo.testOtp || '')}
+                                className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold cursor-pointer shrink-0"
+                              >
+                                कोड भरें
+                              </button>
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex gap-2">
                         <input

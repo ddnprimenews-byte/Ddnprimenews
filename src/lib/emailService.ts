@@ -42,12 +42,36 @@ function getTransporter() {
   });
 }
 
+export interface EmailSendResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  authRequired?: boolean;
+  senderEmail: string;
+  recipientEmail: string;
+}
+
 /**
  * Send 6-Digit Email Verification OTP
  */
-export async function sendOtpEmail(recipientEmail: string, otpCode: string): Promise<boolean> {
-  const transporter = getTransporter();
+export async function sendOtpEmail(recipientEmail: string, otpCode: string): Promise<EmailSendResult> {
+  const senderEmail = process.env.SMTP_USER || process.env.EMAIL_USER || 'ddnprimenews@gmail.com';
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
   const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${DDN_EDITORIAL_OFFICE.officialEmail}>`;
+
+  if (!pass) {
+    const reason = 'Gmail SMTP प्रमाणीकरण (Google App Password) अनुपलब्ध है। Google Gmail से स्वचालित ईमेल भेजने हेतु 16-अक्षरों का App Password अनिवार्य है।';
+    console.warn(`[EmailService] Sender: ${senderEmail} -> Recipient: ${recipientEmail}. Reason: SMTP_PASS is empty. Direct unauthenticated Gmail dispatch is blocked by Google (530 Authentication Required).`);
+    return {
+      success: false,
+      authRequired: true,
+      error: reason,
+      senderEmail,
+      recipientEmail,
+    };
+  }
+
+  const transporter = getTransporter();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -108,27 +132,51 @@ export async function sendOtpEmail(recipientEmail: string, otpCode: string): Pro
   `;
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: fromEmail,
       to: recipientEmail,
       subject: `🔒 ${otpCode} — डीडीएन प्राइम न्यूज़ रिपोर्टर सत्यापन कोड (Email OTP)`,
       html: htmlContent,
       text: `डीडीएन प्राइम न्यूज़ पत्रकार सत्यापन कोड (OTP): ${otpCode}। यह कोड 10 मिनट के लिए मान्य है।`,
     });
-    console.log(`[EmailService] OTP email successfully sent to ${recipientEmail}`);
-    return true;
+    console.log(`[EmailService] OTP email successfully dispatched to ${recipientEmail}. MessageId:`, info?.messageId);
+    return {
+      success: true,
+      message: `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${recipientEmail}) पर प्रेषक (${senderEmail}) द्वारा सफलतापूर्वक भेज दिया गया है।`,
+      senderEmail,
+      recipientEmail,
+    };
   } catch (err: any) {
-    console.warn(`[EmailService] Email dispatch note (${recipientEmail}):`, err.message);
-    return false;
+    const isAuth = err.message?.includes('530') || err.message?.toLowerCase().includes('auth') || err.message?.toLowerCase().includes('credential');
+    console.warn(`[EmailService] Email dispatch failed (${recipientEmail}):`, err.message);
+    return {
+      success: false,
+      authRequired: isAuth,
+      error: `Gmail SMTP सर्वर अस्वीकृति: ${err.message}`,
+      senderEmail,
+      recipientEmail,
+    };
   }
 }
 
-/**
- * Send Welcome & Application Acknowledgement Letter Email to Applicant
- */
-export async function sendWelcomeApplicationEmail(app: ReporterApplication): Promise<boolean> {
-  const transporter = getTransporter();
+export async function sendWelcomeApplicationEmail(app: ReporterApplication): Promise<EmailSendResult> {
+  const senderEmail = process.env.SMTP_USER || process.env.EMAIL_USER || 'ddnprimenews@gmail.com';
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
   const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${DDN_EDITORIAL_OFFICE.officialEmail}>`;
+
+  if (!pass) {
+    const reason = 'Gmail SMTP प्रमाणीकरण (Google App Password) अनुपलब्ध है।';
+    console.warn(`[EmailService] Welcome email not dispatched: SMTP_PASS is empty for sender ${senderEmail}`);
+    return {
+      success: false,
+      authRequired: true,
+      error: reason,
+      senderEmail,
+      recipientEmail: app.email,
+    };
+  }
+
+  const transporter = getTransporter();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -267,17 +315,29 @@ export async function sendWelcomeApplicationEmail(app: ReporterApplication): Pro
   `;
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: fromEmail,
       to: app.email,
       subject: `🎉 आवेदन स्वीकृति पावती पत्र (Ref: ${app.id}) — डीडीएन प्राइम न्यूज़`,
       html: htmlContent,
       text: `प्रिय ${app.fullName}, डीडीएन प्राइम न्यूज़ में आपका आवेदन (Ref: ${app.id}) प्राप्त हो चुका है। प्रधान कार्यालय: ${DDN_EDITORIAL_OFFICE.headOfficeAddress}। संपर्क: ${DDN_EDITORIAL_OFFICE.helplinePhone}`,
     });
-    console.log(`[EmailService] Welcome email successfully sent to ${app.email}`);
-    return true;
+    console.log(`[EmailService] Welcome email successfully dispatched to ${app.email}. MessageId:`, info?.messageId);
+    return {
+      success: true,
+      message: `स्वागत पावती पत्र ईमेल पर भेज दिया गया है।`,
+      senderEmail,
+      recipientEmail: app.email,
+    };
   } catch (err: any) {
-    console.warn(`[EmailService] Welcome email dispatch note (${app.email}):`, err.message);
-    return false;
+    const isAuth = err.message?.includes('530') || err.message?.toLowerCase().includes('auth') || err.message?.toLowerCase().includes('credential');
+    console.warn(`[EmailService] Welcome email dispatch failed (${app.email}):`, err.message);
+    return {
+      success: false,
+      authRequired: isAuth,
+      error: err.message,
+      senderEmail,
+      recipientEmail: app.email,
+    };
   }
 }

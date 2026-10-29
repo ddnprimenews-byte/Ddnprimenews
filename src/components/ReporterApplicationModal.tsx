@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   X, UserCheck, Upload, CheckCircle2, Printer, 
   ShieldCheck, Award, FileText, ArrowLeft, Download, AlertCircle,
-  Mail, Send, Check, RefreshCw, MapPin, Building, Flag, Lock
+  Mail, Send, Check, RefreshCw, MapPin, Building, Flag, Lock, Copy
 } from 'lucide-react';
 import { ReporterApplication } from '../types/news';
 import { reporterApplicationSchema, ReporterApplicationInput } from '../lib/validations';
@@ -111,8 +111,8 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
   const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
   const [otpError, setOtpError] = useState<string>('');
   const [otpSuccess, setOtpSuccess] = useState<string>('');
-  const [otpNotice, setOtpNotice] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
+  const [copiedRef, setCopiedRef] = useState<boolean>(false);
 
   const {
     register,
@@ -148,7 +148,6 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
     if (isEmailVerified) {
       setIsEmailVerified(false);
       setOtpSent(false);
-      setOtpNotice(null);
       setOtpSuccess('');
     }
   }, [currentEmail]);
@@ -209,7 +208,6 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
   const handleSendOtp = async () => {
     setOtpError('');
     setOtpSuccess('');
-    setOtpNotice(null);
 
     const emailToVerify = currentEmail?.trim();
     if (!emailToVerify || !emailToVerify.includes('@')) {
@@ -227,16 +225,15 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
       const data = await res.json();
 
       if (!res.ok) {
-        setOtpError(data.error || 'ओटीपी भेजने में विफलता।');
+        setOtpError(data.error || 'ओटीपी भेजने में विफलता। कृपया पुनः प्रयास करें।');
         return;
       }
 
       setOtpSent(true);
       setCountdown(60);
-      setOtpSuccess(data.message || 'सत्यापन कोड भेजा गया।');
-      if (data.demoOtp) {
-        setOtpNotice(data.demoOtp);
-      }
+      setOtpSuccess(
+        data.message || `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${emailToVerify}) पर सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`
+      );
     } catch (err: any) {
       setOtpError('ओटीपी सेवा से संपर्क नहीं हो सका: ' + err.message);
     } finally {
@@ -266,13 +263,12 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
       const data = await res.json();
 
       if (!res.ok) {
-        setOtpError(data.error || 'ओटीपी सत्यापन विफल हुआ।');
+        setOtpError(data.error || 'ओटीपी सत्यापन विफल हुआ। कृपया सही कोड दर्ज करें।');
         return;
       }
 
       setIsEmailVerified(true);
-      setOtpSuccess('ईमेल आईडी सफलतापूर्वक सत्यापित हो गई! ✓');
-      setOtpNotice(null);
+      setOtpSuccess('ईमेल आईडी सफलतापूर्वक सत्यापित हो गई! ✓ अब आप आवेदन जमा कर सकते हैं।');
     } catch (err: any) {
       setOtpError('सत्यापन में त्रुटि: ' + err.message);
     } finally {
@@ -413,8 +409,8 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
     setIdProofName(null);
     setIsEmailVerified(false);
     setOtpSent(false);
-    setOtpNotice(null);
     setEnteredOtp('');
+    setCopiedRef(false);
     resetHookForm();
   };
 
@@ -660,17 +656,16 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
 
                   {/* OTP INPUT BOX (Displayed when OTP is sent and not yet verified) */}
                   {otpSent && !isEmailVerified && (
-                    <div className="p-3 bg-white border-2 border-dashed border-red-300 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="p-3 bg-white border-2 border-dashed border-red-300 rounded-xl space-y-2.5 animate-in fade-in">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-stone-800 flex items-center gap-1">
+                        <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
                           <Lock className="w-3.5 h-3.5 text-red-600" />
                           <span>ईमेल पर भेजा गया 6 अंकों का ओटीपी दर्ज करें:</span>
                         </span>
-                        {otpNotice && (
-                          <span className="text-[11px] font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
-                            सुरक्षा कोड: {otpNotice}
-                          </span>
-                        )}
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          <span>ईमेल पर भेजा गया</span>
+                        </span>
                       </div>
 
                       <div className="flex gap-2">
@@ -989,20 +984,58 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
             /* Application Submitted View: Printable Acknowledgement Receipt */
             <div className="space-y-6 animate-in fade-in">
               <div className="space-y-4">
+                {/* Prominent Reference Number Card */}
+                <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-500 rounded-2xl p-5 shadow-sm text-center space-y-3">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-full text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>आवेदन सफलतापूर्वक प्राप्त हुआ (Application Submitted)</span>
+                  </div>
+                  
+                  <div>
+                    <div className="text-xs font-bold text-stone-600 mb-1">
+                      पंजीकरण संदर्भ संख्या (Registration Reference No):
+                    </div>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <span className="font-mono text-2xl sm:text-3xl font-black text-emerald-950 bg-white px-5 py-2 rounded-xl border-2 border-emerald-300 shadow-inner tracking-wider select-all">
+                        {submittedApp.id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(submittedApp.id);
+                          setCopiedRef(true);
+                          setTimeout(() => setCopiedRef(false), 2500);
+                        }}
+                        className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>{copiedRef ? 'कॉपी हो गया! ✓' : 'कॉपी करें'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-emerald-200/80 text-xs text-emerald-900 font-medium flex items-center justify-center gap-2 flex-wrap">
+                    <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>
+                      मुख्य संपादक के पते व हेल्पलाइन सहित आधिकारिक स्वागत पत्र आपकी ईमेल (<strong>{submittedApp.email}</strong>) पर भेज दिया गया है।
+                    </span>
+                  </div>
+                </div>
+
                 <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl flex items-start gap-3 text-amber-950 text-xs sm:text-sm shadow-xs">
                   <ShieldCheck className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-bold text-base text-amber-950 font-serif">
-                      आवेदन सफलतापूर्वक दर्ज — सत्यापन प्रक्रियाधीन (Pending Verification)
+                    <h4 className="font-bold text-sm sm:text-base text-amber-950 font-serif">
+                      सत्यापन प्रक्रियाधीन (Under Editorial Verification)
                     </h4>
                     <p className="text-amber-900 text-xs mt-1 leading-relaxed">
-                      आपका पंजीकरण संख्या: <strong className="font-mono text-sm text-stone-900 bg-amber-200/60 px-2 py-0.5 rounded">{submittedApp.id}</strong> है। आपका आवेदन DDN Prime News मुख्य संपादकीय डेस्क के पास समीक्षा हेतु पहुंच गया है।
+                      आपका आवेदन DDN Prime News मुख्य संपादकीय डेस्क के पास समीक्षा हेतु पहुंच गया है। पहचान पत्र एवं दस्तावेजों की पुष्टि के उपरांत डिजिटल प्रेस मान्यता कार्ड जारी किया जाएगा।
                     </p>
                   </div>
                 </div>
 
                 {/* Printable Acknowledgement Receipt */}
-                <div id="printable-press-card" className="border-2 border-stone-300 rounded-xl bg-white p-6 shadow-sm font-sans">
+                <div id="printable-press-card" className="border-2 border-stone-300 rounded-xl bg-white p-6 shadow-sm font-sans space-y-4">
                   <div className="border-b border-stone-200 pb-4 text-center">
                     <span className="text-[10px] uppercase font-mono tracking-widest text-red-700 font-bold bg-red-50 px-2.5 py-1 rounded">
                       संवाददाता भर्ती पावती रसीद / APPLICATION RECEIPT
@@ -1013,7 +1046,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                     <p className="text-xs text-stone-500">दरभंगा डिजिटल नेटवर्क — MSME Registered (UDYAM-BR-09-0028491)</p>
                   </div>
 
-                  <div className="py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                  <div className="py-2 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
                     <div className="sm:col-span-2 space-y-2 text-xs">
                       <div className="flex justify-between border-b border-stone-100 py-1">
                         <span className="text-stone-500">पंजीकरण संख्या (Ref ID):</span>
@@ -1081,7 +1114,20 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-stone-200 text-[11px] text-stone-500 leading-relaxed bg-stone-50/60 p-3 rounded-lg">
+                  {/* Official Head Office & Chief Editor Details */}
+                  <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200 text-xs text-amber-950 space-y-1">
+                    <div className="font-bold text-amber-900 flex items-center justify-between">
+                      <span>प्रधान कार्यालय एवं मुख्य संपादकीय मंडल:</span>
+                      <span className="font-mono text-[10px] bg-amber-200/80 px-2 py-0.5 rounded">UDYAM-BR-09-0028491</span>
+                    </div>
+                    <p className="text-[11px] text-stone-700 leading-relaxed">
+                      <strong>प्रधान संपादक:</strong> श्री राजेश कुमार साहू (Rajesh Kumar Sahu)<br />
+                      <strong>कार्यालय पता:</strong> वार्ड नंबर 9, पैगंबरपुर, पोस्ट- दरमा, थाना- क्यूटी, जिला- दरभंगा, बिहार - 847121<br />
+                      <strong>हेल्पलाइन / संपर्क:</strong> +91 9341050287 | <strong>ईमेल:</strong> ddnprimenews@gmail.com
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-200 text-[11px] text-stone-500 leading-relaxed bg-stone-50/60 p-2.5 rounded-lg">
                     <p className="font-semibold text-stone-700 mb-0.5">संपादकीय सत्यापन सूचना:</p>
                     यह केवल आवेदन पावती रसीद है। प्रेस काउंसिल ऑफ इंडिया एवं डीडीएन प्राइम न्यूज आचार संहिता के अनुसार, पहचान पत्र व पृष्ठभूमि सत्यापन के बाद मुख्य संपादक द्वारा अधिकृत प्रेस कार्ड जारी किया जाएगा।
                   </div>

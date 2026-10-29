@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { reporterApplicationSchema } from '@/src/lib/validations';
 import { ReporterService } from '@/src/lib/dbService';
 import { ReporterApplication } from '@/src/types/news';
+import { sendWelcomeApplicationEmail } from '@/src/lib/emailService';
 
 /**
  * POST /api/reporter
@@ -78,10 +79,17 @@ export async function POST(request: NextRequest) {
 
     const savedId = await ReporterService.submitApplication(newApplication);
 
+    // Send official Welcome & Acknowledgement Letter to applicant's verified email
+    try {
+      await sendWelcomeApplicationEmail(newApplication);
+    } catch (mailErr: any) {
+      console.warn('Welcome letter dispatch note:', mailErr.message);
+    }
+
     return NextResponse.json(
       {
         success: true,
-        message: 'पत्रकार आवेदन सफलतापूर्वक दर्ज कर लिया गया है। संपादकीय बोर्ड द्वारा सत्यापन के उपरांत प्रेस कार्ड जारी किया जाएगा।',
+        message: 'पत्रकार आवेदन सफलतापूर्वक दर्ज कर लिया गया है। आधिकारिक स्वागत पत्र आपके ईमेल पर भेज दिया गया है।',
         applicationId: savedId,
       },
       { status: 201 }

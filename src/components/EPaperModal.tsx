@@ -338,19 +338,110 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
     }
   };
 
-  // Clean Print Handler: Uses isolated @media print rules in globals.css
+  // Clean Print Handler: Generates an isolated clean iframe to print all 8 pages without blank sheets
   const handlePrint = () => {
-    window.print();
+    try {
+      const printContainer = document.getElementById('epaper-print-container');
+      if (!printContainer) {
+        window.print();
+        return;
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '-99999px';
+      iframe.style.left = '-99999px';
+      iframe.style.width = '1000px';
+      iframe.style.height = '1400px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
+
+      // Collect stylesheets and fonts
+      const links = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+        .map((el) => el.outerHTML)
+        .join('\n');
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html lang="hi">
+        <head>
+          <meta charset="utf-8" />
+          <title>दैनिक ई-पेपर (8 पृष्ठ ब्रॉडशीट) | डीडीएन प्राइम न्यूज़</title>
+          ${links}
+          <style>
+            @page {
+              size: A3 portrait;
+              margin: 6mm;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+              font-family: 'Mukta', serif;
+              overflow: visible !important;
+              height: auto !important;
+            }
+            .epaper-sheet-page {
+              display: block !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              padding: 6mm !important;
+              margin: 0 !important;
+              background: #ffffff !important;
+              width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .no-print, button {
+              display: none !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="epaper-print-container">
+            ${printContainer.innerHTML}
+          </div>
+        </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          window.print();
+        } finally {
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 3000);
+        }
+      }, 400);
+    } catch (err) {
+      window.print();
+    }
   };
 
   return (
     <div 
       ref={modalRef}
       id="epaper-modal-root"
-      className="fixed inset-0 z-50 overflow-hidden bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-0 sm:p-2 font-sans select-none print:p-0 print:bg-white print:fixed-none"
+      className="fixed inset-0 z-50 overflow-hidden bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-0 sm:p-2 font-sans select-none print:p-0 print:bg-white print:static print:overflow-visible"
     >
       {/* Main Container */}
-      <div className="bg-[#f0ebe1] rounded-none sm:rounded-xl shadow-2xl w-full max-w-[1450px] h-full sm:h-[98vh] overflow-hidden border border-stone-400 flex flex-col print:border-none print:h-auto print:rounded-none">
+      <div className="bg-[#f0ebe1] rounded-none sm:rounded-xl shadow-2xl w-full max-w-[1450px] h-full sm:h-[98vh] overflow-hidden border border-stone-400 flex flex-col print:border-none print:h-auto print:max-h-none print:rounded-none print:overflow-visible">
         
         {/* ========================================================= */}
         {/* TOP CONTROL BAR (Hide on print)                           */}
@@ -463,11 +554,12 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
               <span>प्रिंट</span>
             </button>
 
-            {/* General Share Link */}
+            {/* Direct E-Paper PDF Share Button */}
             <button
-              onClick={handleShareLink}
-              className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded transition cursor-pointer"
-              title="ई-पेपर लिंक शेयर करें"
+              onClick={handleSharePdfToWhatsApp}
+              disabled={isGeneratingPdf}
+              className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded transition cursor-pointer disabled:opacity-60"
+              title="8 पृष्ठ ई-पेपर PDF शेयर करें"
             >
               <Share2 className="w-4 h-4" />
             </button>
@@ -709,13 +801,20 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
               </div>
             </div>
 
-            {/* 1-TAP INSTANT ACTION BUTTON - 0ms GESTURE TO ATTACH PDF DIRECTLY */}
+            {/* 1-TAP INSTANT ACTION BUTTON 1: ATTACH PDF DIRECTLY */}
             <button
               onClick={async () => {
                 const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
                 const cleanShareText = `📰 *दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़*\n` +
                   `📍 दरभंगा, मिथिलांचल एवं बिहार\n` +
                   `🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
+
+                // Automatically copy headline message to clipboard so user can also paste in chat
+                try {
+                  await navigator.clipboard?.writeText(cleanShareText);
+                } catch (clipErr) {
+                  // Ignore clipboard errors
+                }
 
                 if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [whatsappShareData.file] })) {
                   try {
@@ -724,8 +823,7 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
                       title: 'दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़',
                       text: cleanShareText,
                     });
-                    setShowDirectWhatsAppDialog(false);
-                    setShareToast('व्हाट्सएप पर ई-पेपर पीडीएफ भेज दिया गया!');
+                    setShareToast('व्हाट्सएप पर PDF फाइल भेजी गई! हेडिंग संदेश भी क्लिपबोर्ड पर कॉपी है।');
                     return;
                   } catch (e: any) {
                     if (e.name === 'AbortError') return;
@@ -735,13 +833,33 @@ export const EPaperModal: React.FC<EPaperModalProps> = ({
                 // Fallback for devices without File share capability
                 const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(cleanShareText)}`;
                 window.open(waUrl, '_blank');
-                setShowDirectWhatsAppDialog(false);
               }}
-              className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#1faa50] text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm shadow-md transition cursor-pointer active:scale-98"
+              className="w-full py-3 px-4 bg-[#25D366] hover:bg-[#1faa50] text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm shadow-md transition cursor-pointer active:scale-98"
             >
-              <MessageCircle className="w-5 h-5 fill-current" />
-              <span>WhatsApp पर सीधे PDF भेजें ➔</span>
+              <FileText className="w-4 h-4 fill-current text-white" />
+              <span>1. WhatsApp पर PDF फाइल भेजें ➔</span>
             </button>
+
+            {/* ACTION BUTTON 2: SEND CLEAN HEADLINE TEXT MESSAGE DIRECTLY TO WHATSAPP */}
+            <button
+              onClick={() => {
+                const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?view=epaper` : 'https://ddnprimenews.com';
+                const cleanShareText = `📰 *दैनिक ई-पेपर | डीडीएन प्राइम न्यूज़*\n` +
+                  `📍 दरभंगा, मिथिलांचल एवं बिहार\n` +
+                  `🌐 ऑनलाइन ई-पेपर पढ़ने हेतु लिंक:\n${shareUrl}`;
+                
+                const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(cleanShareText)}`;
+                window.open(waUrl, '_blank');
+              }}
+              className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold flex items-center justify-center gap-2 text-xs shadow-xs transition cursor-pointer active:scale-98"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-600" />
+              <span>2. साथ में हेडिंग संदेश भी WhatsApp में भेजें ➔</span>
+            </button>
+
+            <p className="text-[11px] text-stone-500 text-center leading-tight">
+              💡 <strong>नोट:</strong> PDF भेजते समय हेडिंग संदेश क्लिपबोर्ड पर अपने-आप कॉपी हो जाता है, आप चैट में सीधा पेस्ट भी कर सकते हैं।
+            </p>
 
             {/* Optional download only if requested */}
             <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-xs">

@@ -643,8 +643,14 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                                 {app.id}
                               </span>
                               <h4 className="font-bold text-stone-900 text-sm mt-1">{app.fullName}</h4>
-                              <p className="text-[11px] text-stone-500">
-                                पिता: {app.fatherName || '—'} | मोबाइल: {app.mobile} | ईमेल: {app.email || '—'}
+                              <p className="text-[11px] text-stone-600">
+                                पिता: <strong>{app.fatherName || '—'}</strong> | माता: <strong>{app.motherName || '—'}</strong> | मोबाइल: <span className="font-mono">{app.mobile}</span> | व्हाट्सएप: <span className="font-mono font-semibold text-emerald-800">{app.whatsapp || app.mobile}</span>
+                              </p>
+                              <p className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
+                                <span>ईमेल: {app.email || '—'}</span>
+                                <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  ✓ ईमेल सत्यापित (Email Verified)
+                                </span>
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -664,22 +670,22 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-stone-600">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-stone-600 bg-white p-2.5 rounded-lg border border-stone-200">
                             <div>
-                              <span className="text-stone-400 block text-[10px]">जिला / प्रखंड:</span>
-                              <strong>{app.district} / {app.block}</strong>
+                              <span className="text-stone-400 block text-[10px]">राज्य / जिला:</span>
+                              <strong className="text-stone-800">{app.state || 'बिहार'} / {app.district}</strong>
                             </div>
                             <div>
-                              <span className="text-stone-400 block text-[10px]">योग्यता:</span>
-                              <span>{app.qualification || '—'}</span>
+                              <span className="text-stone-400 block text-[10px]">प्रखंड / कार्यक्षेत्र:</span>
+                              <strong className="text-stone-800">{app.block} / {app.panchayat || app.workArea || '—'}</strong>
                             </div>
                             <div>
-                              <span className="text-stone-400 block text-[10px]">अनुभव:</span>
-                              <span>{app.experience || '—'}</span>
+                              <span className="text-stone-400 block text-[10px]">योग्यता व अनुभव:</span>
+                              <span>{app.qualification || '—'} ({app.experience || '—'})</span>
                             </div>
                             <div>
-                              <span className="text-stone-400 block text-[10px]">बीट:</span>
-                              <span>{app.beatPreference}</span>
+                              <span className="text-stone-400 block text-[10px]">रुचि का क्षेत्र (Beat):</span>
+                              <span className="font-medium text-red-800">{app.beatPreference}</span>
                             </div>
                           </div>
 

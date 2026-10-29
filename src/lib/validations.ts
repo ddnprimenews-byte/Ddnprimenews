@@ -13,13 +13,18 @@ export const reporterApplicationSchema = z.object({
   fullName: z
     .string()
     .trim()
-    .min(3, { message: 'पूरा नाम कम से कम 3 अक्षरों का होना चाहिए।' })
+    .min(3, { message: 'आवेदक का पूरा नाम कम से कम 3 अक्षरों का होना चाहिए।' })
     .max(60, { message: 'नाम 60 अक्षरों से अधिक नहीं हो सकता।' }),
   fatherName: z
     .string()
     .trim()
     .min(3, { message: 'पिता/अभिभावक का नाम आवश्यक है।' })
     .max(60, { message: 'नाम 60 अक्षरों से अधिक नहीं हो सकता।' }),
+  motherName: z
+    .string()
+    .trim()
+    .min(3, { message: 'माता का नाम आवश्यक है।' })
+    .max(60, { message: 'माता का नाम 60 अक्षरों से अधिक नहीं हो सकता।' }),
   mobile: z
     .string()
     .trim()
@@ -27,15 +32,20 @@ export const reporterApplicationSchema = z.object({
   whatsapp: z
     .string()
     .trim()
-    .regex(INDIAN_PHONE_REGEX, { message: 'मान्य 10 अंकों का व्हाट्सएप नंबर दर्ज करें।' }),
+    .regex(INDIAN_PHONE_REGEX, { message: 'व्हाट्सएप नंबर अनिवार्य है (मान्य 10 अंक दर्ज करें)।' }),
   email: z
     .string()
     .trim()
     .email({ message: 'कृपया मान्य ईमेल पता दर्ज करें।' })
     .toLowerCase(),
+  state: z
+    .string()
+    .min(1, { message: 'कृपया राज्य चुनें।' }),
   district: z
     .string()
-    .min(1, { message: 'कृपया जिला चुनें।' }),
+    .trim()
+    .min(2, { message: 'कृपया जिला चुनें या दर्ज करें।' })
+    .max(50, { message: 'जिले का नाम 50 अक्षरों से कम होना चाहिए।' }),
   block: z
     .string()
     .trim()
@@ -44,8 +54,8 @@ export const reporterApplicationSchema = z.object({
   panchayat: z
     .string()
     .trim()
-    .min(2, { message: 'पंचायत अथवा वार्ड संख्या दर्ज करें।' })
-    .max(50, { message: 'पंचायत का नाम 50 अक्षरों से कम होना चाहिए।' }),
+    .min(2, { message: 'कार्यक्षेत्र / पंचायत / वार्ड का नाम दर्ज करें।' })
+    .max(80, { message: 'कार्यक्षेत्र का नाम 80 अक्षरों से कम होना चाहिए।' }),
   qualification: z
     .string()
     .min(1, { message: 'शैक्षणिक योग्यता चुनें।' }),
@@ -58,7 +68,7 @@ export const reporterApplicationSchema = z.object({
   agreement: z
     .boolean()
     .refine((val) => val === true, {
-      message: 'आगे बढ़ने के लिए नियम, निष्पक्षता एवं आचार संहिता की स्वीकृति अनिवार्य है।',
+      message: 'आगे बढ़ने के लिए पत्रकार आचार संहिता एवं रिपोर्टिंग नियमावली की स्वीकृति अनिवार्य है।',
     }),
 });
 

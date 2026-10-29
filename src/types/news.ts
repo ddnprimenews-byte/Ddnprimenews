@@ -69,12 +69,17 @@ export interface ReporterApplication {
   id: string;
   fullName: string;
   fatherName: string;
+  motherName?: string;
   mobile: string;
   whatsapp: string;
   email: string;
+  isEmailVerified?: boolean;
+  nationality?: string;
+  state?: string;
   district: string;
   block: string;
   panchayat: string;
+  workArea?: string;
   qualification: string;
   experience: string;
   beatPreference: string;

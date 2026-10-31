@@ -25,11 +25,12 @@ export interface CompressionOptions {
   maxSizeKb?: number;
   targetFormat?: 'image/webp' | 'image/jpeg';
   initialQuality?: number;
+  aspectRatio?: '16:9' | 'preserve';
 }
 
 /**
  * Compresses an image in the browser using HTML5 Canvas to WebP format,
- * scaling down resolution and iterating quality to guarantee size under target (default 100KB).
+ * cropping to standard 16:9 news banner format (1280x720) and optimizing quality to guarantee size under target (default 100KB).
  */
 export async function compressImageToWebp(
   file: File,
@@ -37,10 +38,11 @@ export async function compressImageToWebp(
 ): Promise<CompressionResult> {
   const {
     maxWidth = 1280,
-    maxHeight = 960,
+    maxHeight = 720,
     maxSizeKb = 100,
     targetFormat = 'image/webp',
     initialQuality = 0.82,
+    aspectRatio = '16:9',
   } = options;
 
   const originalSizeKb = Math.round(file.size / 1024);
@@ -53,27 +55,50 @@ export async function compressImageToWebp(
       img.onerror = () => reject(new Error('इमेज डेटा प्रोसेस करने में असमर्थ।'));
       img.onload = async () => {
         try {
-          // 1. Calculate aspect-ratio preserved dimensions
-          let { width, height } = img;
-          if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
-          }
-
-          // 2. Render to offscreen canvas
           const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
             throw new Error('Canvas 2D context उपलब्ध नहीं है।');
           }
 
-          // Image smoothing for clean news graphics
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
+
+          const srcW = img.naturalWidth || img.width;
+          const srcH = img.naturalHeight || img.height;
+
+          if (aspectRatio === '16:9') {
+            // Strict 16:9 standard for news articles with smart center crop
+            const targetRatio = 16 / 9;
+            const srcRatio = srcW / srcH;
+            let sx = 0, sy = 0, sw = srcW, sh = srcH;
+
+            if (srcRatio > targetRatio) {
+              // Image is wider than 16:9 - center crop horizontally
+              sw = srcH * targetRatio;
+              sx = (srcW - sw) / 2;
+            } else {
+              // Image is taller than 16:9 - center crop vertically
+              sh = srcW / targetRatio;
+              sy = (srcH - sh) / 2;
+            }
+
+            canvas.width = Math.min(maxWidth, 1280);
+            canvas.height = Math.round(canvas.width * (9 / 16));
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+          } else {
+            // Aspect-ratio preserved scaling
+            let width = srcW;
+            let height = srcH;
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+          }
 
           // 3. Progressive binary optimization to guarantee <= maxSizeKb
           let quality = initialQuality;
@@ -104,8 +129,8 @@ export async function compressImageToWebp(
 
           // If still over 100KB due to large detailed photo, scale dimensions by 20%
           if (blob.size / 1024 > maxSizeKb) {
-            canvas.width = Math.round(width * 0.8);
-            canvas.height = Math.round(height * 0.8);
+            canvas.width = Math.round(canvas.width * 0.8);
+            canvas.height = Math.round(canvas.height * 0.8);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             blob = await getCanvasBlob(0.7);
           }

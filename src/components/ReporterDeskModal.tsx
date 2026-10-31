@@ -5,10 +5,16 @@ import { Article, NewsCategory } from '../types/news';
 import { 
   X, PenTool, CheckCircle2, ShieldCheck, 
   LogIn, LogOut, UserCheck, Sparkles, Loader2, 
-  FileText, MapPin, Eye, Lock, Mail, AlertCircle
+  FileText, MapPin, Eye, Lock, Mail, AlertCircle, Building, Flag, Compass
 } from 'lucide-react';
 import { saveArticleToFirestore } from '../lib/firebase';
 import { OptimizedImageUploader } from './OptimizedImageUploader';
+import { 
+  BIHAR_DISTRICTS, 
+  INDIA_STATES, 
+  getBiharBlocks, 
+  getStateDistricts 
+} from '../data/locationsData';
 
 interface ReporterDeskModalProps {
   isOpen: boolean;
@@ -87,11 +93,53 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
   const [contentBody, setContentBody] = useState('');
   const [category, setCategory] = useState<NewsCategory>('bihar');
   const [location, setLocation] = useState('दरभंगा');
+
+  // 1. Bihar Category Specific Hierarchy (जिला एवं प्रखंड)
+  const [biharDistrict, setBiharDistrict] = useState('दरभंगा');
+  const [biharBlock, setBiharBlock] = useState('बेनीपुर');
+  const [customBiharBlock, setCustomBiharBlock] = useState('');
+  const [panchayatWard, setPanchayatWard] = useState('');
+
+  // 2. National (देश) Category Specific Hierarchy (राज्य एवं जिला/शहर)
+  const [nationalState, setNationalState] = useState('उत्तर प्रदेश');
+  const [nationalDistrict, setNationalDistrict] = useState('लखनऊ');
+  const [customNationalDistrict, setCustomNationalDistrict] = useState('');
+
+  // 3. Other Categories Location State
+  const [otherCategoryLocation, setOtherCategoryLocation] = useState('दरभंगा / बिहार');
+
   const [uploadedImageUrl, setUploadedImageUrl] = useState('/images/ddn_hero_news.jpg');
   const [videoUrl, setVideoUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Computed location string based on active category
+  const getEffectiveLocation = (): string => {
+    if (category === 'bihar') {
+      const activeBlock = biharBlock === 'अन्य प्रखंड (मैन्युअल लिखें)'
+        ? customBiharBlock.trim()
+        : biharBlock;
+      let loc = biharDistrict;
+      if (activeBlock) {
+        loc += ` (प्रखंड: ${activeBlock})`;
+      }
+      if (panchayatWard.trim()) {
+        loc += ` · ${panchayatWard.trim()}`;
+      }
+      return loc;
+    } else if (category === 'national') {
+      const activeDist = nationalDistrict === 'अन्य जिला (मैन्युअल लिखें)'
+        ? customNationalDistrict.trim()
+        : nationalDistrict;
+      if (activeDist) {
+        return `${nationalState} (${activeDist})`;
+      }
+      return nationalState;
+    } else {
+      return otherCategoryLocation.trim() || location.trim() || currentUser?.district || 'बिहार';
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -189,6 +237,8 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
     const newSlug = generateSlug(title);
     const nowIso = new Date().toISOString();
 
+    const finalLocation = getEffectiveLocation();
+
     const newArticle: Article = {
       id: `art-${Date.now()}`,
       slug: newSlug,
@@ -205,7 +255,7 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
         category === 'crime' ? 'अपराध' :
         category === 'sports' ? 'खेल' :
         category === 'entertainment' ? 'मनोरंजन एवं सिनेमा' : 'शिक्षा & हेल्थ',
-      location: location.trim() || currentUser.district,
+      location: finalLocation,
       author: currentUser.name,
       authorRole: currentUser.role,
       publishedAt: 'अभी-अभी (रिपोर्टर प्रेषित)',
@@ -215,7 +265,7 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
       imageUrl: uploadedImageUrl || '/images/ddn_hero_news.jpg',
       status: 'published',
       views: 1,
-      tags: ['डीडीएन प्राइम न्यूज', location, currentUser.name],
+      tags: ['डीडीएन प्राइम न्यूज', finalLocation, currentUser.name],
     };
 
     try {
@@ -522,39 +572,256 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
                     />
                   </div>
 
-                  {/* Category & Location */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">
-                        श्रेणी (Category)
+                  {/* Category & Location Hierarchy */}
+                  <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                        <Flag className="w-3.5 h-3.5 text-red-700" />
+                        <span>समाचार की श्रेणी (News Category) *</span>
                       </label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value as NewsCategory)}
-                        className="w-full px-3 py-1.5 text-xs border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900 bg-white"
-                      >
-                        <option value="bihar">बिहार विशेष</option>
-                        <option value="national">देश (National)</option>
-                        <option value="politics">राजनीति</option>
-                        <option value="crime">अपराध (Crime)</option>
-                        <option value="sports">खेल जगत</option>
-                        <option value="entertainment">मनोरंजन</option>
-                        <option value="education-health">शिक्षा एवं स्वास्थ्य</option>
-                      </select>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">
+                        {category === 'bihar' ? 'बिहार विशेष' :
+                         category === 'national' ? 'देश / राष्ट्रीय' :
+                         category === 'politics' ? 'राजनीति' :
+                         category === 'crime' ? 'अपराध' :
+                         category === 'sports' ? 'खेल जगत' :
+                         category === 'entertainment' ? 'मनोरंजन' : 'शिक्षा एवं स्वास्थ्य'}
+                      </span>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">
-                        स्थान / जिला (Location)
-                      </label>
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="उदा. दरभंगा, मधुबनी, समस्तीपुर..."
-                        className="w-full px-3 py-1.5 text-xs border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900"
-                      />
-                    </div>
+                    <select
+                      value={category}
+                      onChange={(e) => {
+                        const newCat = e.target.value as NewsCategory;
+                        setCategory(newCat);
+                      }}
+                      className="w-full px-3 py-2 text-xs font-bold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900 bg-white shadow-xs cursor-pointer"
+                    >
+                      <option value="bihar">📍 बिहार विशेष (District एवं प्रखंड चयन)</option>
+                      <option value="national">🇮🇳 देश / राष्ट्रीय (सभी 28 राज्य व 8 UTs + जिला/शहर चयन)</option>
+                      <option value="politics">🏛️ राजनीति (Politics)</option>
+                      <option value="crime">🚨 अपराध (Crime / Law & Order)</option>
+                      <option value="sports">🏆 खेल जगत (Sports)</option>
+                      <option value="entertainment">🎬 मनोरंजन एवं सिनेमा (Entertainment)</option>
+                      <option value="education-health">📚 शिक्षा एवं स्वास्थ्य (Education & Health)</option>
+                    </select>
+
+                    {/* DYNAMIC BIHAR LOCATION HIERARCHY */}
+                    {category === 'bihar' && (
+                      <div className="p-3 bg-red-50/70 rounded-lg border border-red-200 space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-red-900 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-red-700" />
+                            <span>बिहार कार्यक्षेत्र विवरण (District &amp; प्रखंड)</span>
+                          </span>
+                          <span className="text-[10px] text-red-700 bg-red-100 px-2 py-0.5 rounded font-mono font-bold">
+                            बिहार विशेष
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* 1. Bihar District Selector (All 38 Districts) */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                              ज़िला चुनें (District) *
+                            </label>
+                            <select
+                              value={biharDistrict}
+                              onChange={(e) => {
+                                const newDist = e.target.value;
+                                setBiharDistrict(newDist);
+                                const blocks = getBiharBlocks(newDist);
+                                if (blocks.length > 0) {
+                                  setBiharBlock(blocks[0]);
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 bg-white text-stone-900 font-medium"
+                            >
+                              {BIHAR_DISTRICTS.map((d) => (
+                                <option key={d.id} value={d.nameHindi}>
+                                  {d.nameHindi} ({d.nameEnglish})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* 2. Bihar Prakhand / Block Selector */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                              प्रखंड / तहसील (Block / Tehsil) *
+                            </label>
+                            <select
+                              value={biharBlock}
+                              onChange={(e) => setBiharBlock(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 bg-white text-stone-900 font-medium"
+                            >
+                              {getBiharBlocks(biharDistrict).map((b) => (
+                                <option key={b} value={b}>
+                                  {b}
+                                </option>
+                              ))}
+                              <option value="अन्य प्रखंड (मैन्युअल लिखें)">
+                                + अन्य प्रखंड (मैन्युअल लिखें)
+                              </option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Custom block input if selected */}
+                        {biharBlock === 'अन्य प्रखंड (मैन्युअल लिखें)' && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                              प्रखंड का नाम लिखें:
+                            </label>
+                            <input
+                              type="text"
+                              value={customBiharBlock}
+                              onChange={(e) => setCustomBiharBlock(e.target.value)}
+                              placeholder="उदा. बेनीपुर, मनीगाछी, बहादुरपुर आदि"
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 bg-white text-stone-900"
+                            />
+                          </div>
+                        )}
+
+                        {/* Optional Panchayat/Ward */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-stone-600 mb-1">
+                            पंचायत / वार्ड / क्षेत्र (वैकल्पिक)
+                          </label>
+                          <input
+                            type="text"
+                            value={panchayatWard}
+                            onChange={(e) => setPanchayatWard(e.target.value)}
+                            placeholder="उदा. पैगंबरपुर पंचायत / वार्ड संख्या 4 / मुख्य चौक"
+                            className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 bg-white text-stone-900"
+                          />
+                        </div>
+
+                        {/* Location Preview Tag */}
+                        <div className="flex items-center gap-1.5 text-[11px] text-red-950 bg-red-100/70 p-1.5 rounded border border-red-200">
+                          <span className="font-bold">स्थान पूर्वावलोकन (Location Tag):</span>
+                          <span className="font-mono bg-white px-2 py-0.5 rounded text-red-800 font-bold border border-red-200">
+                            {getEffectiveLocation()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* DYNAMIC NATIONAL LOCATION HIERARCHY */}
+                    {category === 'national' && (
+                      <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-300 space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-amber-950 flex items-center gap-1">
+                            <Compass className="w-3.5 h-3.5 text-amber-700" />
+                            <span>देश (National) कार्यक्षेत्र: राज्य एवं जिला / शहर</span>
+                          </span>
+                          <span className="text-[10px] text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded font-mono font-bold">
+                            संपूर्ण भारत (All States &amp; UTs)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* 1. Indian States Dropdown (All 28 States + 8 UTs) */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-amber-950 mb-1">
+                              राज्य चुनें (State / UT) *
+                            </label>
+                            <select
+                              value={nationalState}
+                              onChange={(e) => {
+                                const newSt = e.target.value;
+                                setNationalState(newSt);
+                                const dists = getStateDistricts(newSt);
+                                if (dists.length > 0) {
+                                  setNationalDistrict(dists[0]);
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-stone-900 font-medium"
+                            >
+                              {INDIA_STATES.map((st) => (
+                                <option key={st.id} value={st.nameHindi}>
+                                  {st.nameHindi} ({st.nameEnglish})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* 2. State District / City Selector */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-amber-950 mb-1">
+                              जिला / महानगर / शहर (District / City) *
+                            </label>
+                            <select
+                              value={nationalDistrict}
+                              onChange={(e) => setNationalDistrict(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-stone-900 font-medium"
+                            >
+                              {getStateDistricts(nationalState).map((d) => (
+                                <option key={d} value={d}>
+                                  {d}
+                                </option>
+                              ))}
+                              <option value="अन्य जिला (मैन्युअल लिखें)">
+                                + अन्य जिला / शहर (मैन्युअल लिखें)
+                              </option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Custom National District if selected */}
+                        {nationalDistrict === 'अन्य जिला (मैन्युअल लिखें)' && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-amber-950 mb-1">
+                              जिला / शहर का नाम दर्ज करें:
+                            </label>
+                            <input
+                              type="text"
+                              value={customNationalDistrict}
+                              onChange={(e) => setCustomNationalDistrict(e.target.value)}
+                              placeholder="उदा. गाजियाबाद, वाराणसी, प्रयागराज आदि"
+                              className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-stone-900"
+                            />
+                          </div>
+                        )}
+
+                        {/* Location Preview Tag */}
+                        <div className="flex items-center gap-1.5 text-[11px] text-amber-950 bg-amber-100/70 p-1.5 rounded border border-amber-200">
+                          <span className="font-bold">राष्ट्रीय लोकेशन टैग:</span>
+                          <span className="font-mono bg-white px-2 py-0.5 rounded text-amber-900 font-bold border border-amber-300">
+                            {getEffectiveLocation()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* OTHER CATEGORIES LOCATION */}
+                    {category !== 'bihar' && category !== 'national' && (
+                      <div className="p-3 bg-stone-100 rounded-lg border border-stone-200 space-y-2">
+                        <label className="block text-[11px] font-bold text-stone-700">
+                          समाचार स्थान (Location Tag) *
+                        </label>
+                        <input
+                          type="text"
+                          value={otherCategoryLocation}
+                          onChange={(e) => setOtherCategoryLocation(e.target.value)}
+                          placeholder="उदा. दरभंगा, पटना, नई दिल्ली..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 bg-white text-stone-900"
+                        />
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="text-[10px] text-stone-500 font-bold">त्वरित चयन:</span>
+                          {['दरभंगा', 'पटना', 'मिथिलांचल', 'नई दिल्ली', 'बिहार'].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setOtherCategoryLocation(preset)}
+                              className="text-[10px] px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-red-600 text-stone-700 font-medium cursor-pointer"
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Author (Locked to logged-in reporter) */}
@@ -569,12 +836,11 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Image Uploader */}
+                  {/* Image Uploader with 16:9 Aspect Ratio Enforcement */}
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">
-                      समाचार की फ़ोटो (Image URL या डिवाइस से अपलोड)
-                    </label>
                     <OptimizedImageUploader
+                      label="समाचार की मुख्य फ़ोटो (16:9 मानक न्यूज़ बैनर)"
+                      aspectRatio="16:9"
                       currentImageUrl={uploadedImageUrl}
                       onImageSelected={(compResult, uploadedUrl) => {
                         if (uploadedUrl) {

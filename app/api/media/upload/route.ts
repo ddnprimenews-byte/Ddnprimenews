@@ -33,12 +33,17 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const inputBuffer = Buffer.from(arrayBuffer);
 
-    // Run Sharp Optimization Pipeline
+    // Read optional aspect ratio parameter from form data (defaults to 16:9 for news banners)
+    const reqAspect = (formData.get('aspectRatio') as string) || '16:9';
+    const aspectRatioMode = reqAspect === 'preserve' ? 'inside' : '16:9';
+
+    // Run Sharp Optimization Pipeline (Converts any photo to 16:9 news banner standard)
     const optimized = await optimizeImageWithSharp(inputBuffer, {
-      maxWidth: 1200,
-      maxHeight: 1200,
+      maxWidth: 1280,
+      maxHeight: 720,
       maxSizeKb: 100, // Strictly under 100KB
       quality: 82,
+      aspectRatio: aspectRatioMode,
     });
 
     // Generate Base64 WebP Data URL for immediate preview or database storage

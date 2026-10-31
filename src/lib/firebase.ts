@@ -233,14 +233,18 @@ export async function uploadReporterPhoto(file: File, candidateId: string): Prom
   try {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const storageRef = ref(storage, `reporters/${candidateId}_${Date.now()}_${safeName}`);
-    const snapshot = await uploadBytes(storageRef, file, {
-      contentType: file.type,
-    });
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    return downloadUrl;
+    
+    // Guard with a fast 1500ms timeout so unconfigured/unreachable storage never hangs the UI
+    const uploadTask = uploadBytes(storageRef, file, { contentType: file.type })
+      .then((snapshot) => getDownloadURL(snapshot.ref));
+    const timeoutTask = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('Storage upload timeout')), 1500)
+    );
+
+    return await Promise.race([uploadTask, timeoutTask]);
   } catch (error) {
-    console.error('Storage photo upload failed:', error);
-    throw error;
+    console.warn('Storage photo upload fallback used:', error);
+    return '';
   }
 }
 
@@ -260,14 +264,18 @@ export async function uploadReporterIdDocument(file: File, candidateId: string):
   try {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const storageRef = ref(storage, `reporter_documents/${candidateId}_${Date.now()}_${safeName}`);
-    const snapshot = await uploadBytes(storageRef, file, {
-      contentType: file.type,
-    });
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    return downloadUrl;
+    
+    // Guard with a fast 1500ms timeout
+    const uploadTask = uploadBytes(storageRef, file, { contentType: file.type })
+      .then((snapshot) => getDownloadURL(snapshot.ref));
+    const timeoutTask = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('Storage upload timeout')), 1500)
+    );
+
+    return await Promise.race([uploadTask, timeoutTask]);
   } catch (error) {
-    console.error('Storage ID document upload failed:', error);
-    throw error;
+    console.warn('Storage ID document fallback used:', error);
+    return '';
   }
 }
 

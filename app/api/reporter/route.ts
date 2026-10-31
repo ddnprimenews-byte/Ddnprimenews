@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validationResult.data;
-    const applicationId = `DDN-REP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+    const applicationId = (body.id && typeof body.id === 'string' && body.id.startsWith('DDN-REP-'))
+      ? body.id
+      : `DDN-REP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
     const newApplication: ReporterApplication = {
       id: applicationId,
@@ -73,15 +75,21 @@ export async function POST(request: NextRequest) {
       qualification: data.qualification,
       experience: data.experience,
       beatPreference: data.beatPreference,
+      photoUrl: body.photoUrl || '/images/ddn_reporter_press.jpg',
+      idDocumentUrl: body.idDocumentUrl || '',
       appliedDate: new Date().toLocaleDateString('hi-IN'),
       status: 'pending',
     };
 
     const savedId = await ReporterService.submitApplication(newApplication);
 
-    // Send official Welcome & Acknowledgement Letter to applicant's verified email
+    // Send official Welcome & Acknowledgement Letter to applicant's verified email with 5s timeout guard
     try {
-      await sendWelcomeApplicationEmail(newApplication);
+      const emailPromise = sendWelcomeApplicationEmail(newApplication);
+      const timeoutPromise = new Promise<{ success: boolean; error: string }>((resolve) =>
+        setTimeout(() => resolve({ success: false, error: 'Email timeout' }), 5000)
+      );
+      await Promise.race([emailPromise, timeoutPromise]);
     } catch (mailErr: any) {
       console.warn('Welcome letter dispatch note:', mailErr.message);
     }

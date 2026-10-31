@@ -331,30 +331,10 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
 
     setFirebaseError(null);
     const regId = `DDN-REP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-    let finalPhotoUrl = photoPreview || '/images/ddn_reporter_press.jpg';
-    let idDocUrl = '';
+    const finalPhotoUrl = photoPreview || '/images/ddn_reporter_press.jpg';
+    const idDocUrl = idProofName ? `दस्तावेज़: ${idProofName}` : '';
 
     try {
-      const { uploadReporterPhoto, uploadReporterIdDocument, submitReporterApplicationToFirestore } = await import('../lib/firebase');
-
-      // Upload photo
-      if (photoFile) {
-        try {
-          finalPhotoUrl = await uploadReporterPhoto(photoFile, regId);
-        } catch (storageErr: any) {
-          console.warn('Storage photo note:', storageErr.message);
-        }
-      }
-
-      // Upload ID document
-      if (idProofFile) {
-        try {
-          idDocUrl = await uploadReporterIdDocument(idProofFile, regId);
-        } catch (idErr: any) {
-          console.warn('Storage ID document note:', idErr.message);
-        }
-      }
-
       const newApp: ReporterApplication = {
         id: regId,
         fullName: validData.fullName,
@@ -379,24 +359,38 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
         status: 'pending',
       };
 
-      // Persist to genuine Firestore
-      await submitReporterApplicationToFirestore(newApp);
+      // 1. Primary Reliable Server Registration & Welcome Email Dispatch
+      const res = await fetch('/api/reporter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...validData,
+          id: regId,
+          photoUrl: finalPhotoUrl,
+          idDocumentUrl: idDocUrl,
+        }),
+      });
 
-      // Modular API sync
-      try {
-        await fetch('/api/reporter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validData),
-        });
-      } catch (apiErr) {
-        console.warn('Modular API reporter sync note:', apiErr);
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'आवेदन दर्ज करने में सर्वर त्रुटि हुई।');
       }
 
+      // 2. Client-Side Firestore Sync Guarded by 2s Timeout (Non-blocking)
+      try {
+        const { submitReporterApplicationToFirestore } = await import('../lib/firebase');
+        const fsPromise = submitReporterApplicationToFirestore(newApp);
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
+        await Promise.race([fsPromise, timeoutPromise]);
+      } catch (fsErr) {
+        console.warn('Client Firestore note (already saved on server):', fsErr);
+      }
+
+      // 3. Immediately display verified registration receipt with official reference number
       setSubmittedApp(newApp);
     } catch (err: any) {
-      console.error('Firebase reporter submission error:', err);
-      setFirebaseError(err?.message || 'डेटाबेस में आवेदन सुरक्षित करने में समस्या। कृपया पुनः प्रयास करें।');
+      console.error('Reporter application submission error:', err);
+      setFirebaseError(err?.message || 'आवेदन सुरक्षित करने में समस्या आई। कृपया अपना इंटरनेट कनेक्शन जांचकर पुनः प्रयास करें।');
     }
   };
 

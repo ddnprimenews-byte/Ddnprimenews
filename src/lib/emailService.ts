@@ -13,31 +13,32 @@ export const DDN_EDITORIAL_OFFICE = {
   officialWebsite: 'https://ddnprimenews.com',
 };
 
+// Built-in verified Gmail SMTP configuration for DDN Prime News portal
+const DEFAULT_SMTP_HOST = 'smtp.gmail.com';
+const DEFAULT_SMTP_PORT = 587;
+const DEFAULT_SMTP_USER = 'ddnprimenews@gmail.com';
+// 16-character Google App Password provided by portal owner: rlcy krtn hdqb xwkz
+const DEFAULT_SMTP_PASS = 'rlcykrtnhdqbxwkz';
+
+export function getSmtpConfig() {
+  const host = process.env.SMTP_HOST || DEFAULT_SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT) || DEFAULT_SMTP_PORT;
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER || DEFAULT_SMTP_USER;
+  const rawPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || DEFAULT_SMTP_PASS;
+  const pass = rawPass.replace(/\s+/g, '');
+  return { host, port, user, pass };
+}
+
 /**
- * Configure Nodemailer Transporter
- * Supports standard SMTP (Gmail SMTP, Brevo, SendGrid, etc.)
+ * Configure Nodemailer Transporter with official credentials
  */
 function getTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER || 'ddnprimenews@gmail.com';
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
-
-  if (pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false },
-    });
-  }
-
-  // Fallback to direct SMTP if specific password is not yet injected
+  const { host, port, user, pass } = getSmtpConfig();
   return nodemailer.createTransport({
     host,
     port,
-    secure: false,
+    secure: port === 465,
+    auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
 }
@@ -55,23 +56,9 @@ export interface EmailSendResult {
  * Send 6-Digit Email Verification OTP
  */
 export async function sendOtpEmail(recipientEmail: string, otpCode: string): Promise<EmailSendResult> {
-  const senderEmail = process.env.SMTP_USER || process.env.EMAIL_USER || 'ddnprimenews@gmail.com';
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
-  const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${DDN_EDITORIAL_OFFICE.officialEmail}>`;
-
-  if (!pass) {
-    const reason = 'Gmail SMTP प्रमाणीकरण (Google App Password) अनुपलब्ध है। Google Gmail से स्वचालित ईमेल भेजने हेतु 16-अक्षरों का App Password अनिवार्य है।';
-    console.warn(`[EmailService] Sender: ${senderEmail} -> Recipient: ${recipientEmail}. Reason: SMTP_PASS is empty. Direct unauthenticated Gmail dispatch is blocked by Google (530 Authentication Required).`);
-    return {
-      success: false,
-      authRequired: true,
-      error: reason,
-      senderEmail,
-      recipientEmail,
-    };
-  }
-
+  const { user: senderEmail } = getSmtpConfig();
   const transporter = getTransporter();
+  const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${senderEmail}>`;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -160,23 +147,9 @@ export async function sendOtpEmail(recipientEmail: string, otpCode: string): Pro
 }
 
 export async function sendWelcomeApplicationEmail(app: ReporterApplication): Promise<EmailSendResult> {
-  const senderEmail = process.env.SMTP_USER || process.env.EMAIL_USER || 'ddnprimenews@gmail.com';
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
-  const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${DDN_EDITORIAL_OFFICE.officialEmail}>`;
-
-  if (!pass) {
-    const reason = 'Gmail SMTP प्रमाणीकरण (Google App Password) अनुपलब्ध है।';
-    console.warn(`[EmailService] Welcome email not dispatched: SMTP_PASS is empty for sender ${senderEmail}`);
-    return {
-      success: false,
-      authRequired: true,
-      error: reason,
-      senderEmail,
-      recipientEmail: app.email,
-    };
-  }
-
+  const { user: senderEmail } = getSmtpConfig();
   const transporter = getTransporter();
+  const fromEmail = process.env.SMTP_FROM || `DDN Prime News <${senderEmail}>`;
 
   const htmlContent = `
     <!DOCTYPE html>

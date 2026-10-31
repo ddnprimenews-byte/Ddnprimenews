@@ -32,27 +32,20 @@ export async function POST(req: NextRequest) {
       // Dispatch real email via emailService
       const emailResult = await sendOtpEmail(normalizedEmail, generatedOtp);
 
-      if (emailResult.success) {
-        return NextResponse.json({
-          success: true,
-          emailDelivered: true,
-          senderEmail: emailResult.senderEmail,
-          recipientEmail: normalizedEmail,
-          message: `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${normalizedEmail}) पर प्रेषक (${emailResult.senderEmail}) द्वारा सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`,
-        });
-      } else {
-        // Honest disclosure when email failed because SMTP password/auth is required
-        return NextResponse.json({
-          success: true,
-          emailDelivered: false,
-          authRequired: emailResult.authRequired,
-          senderEmail: emailResult.senderEmail,
-          recipientEmail: normalizedEmail,
-          serverError: emailResult.error,
-          testOtp: generatedOtp,
-          message: `ईमेल सर्वर सूचना: प्रेषक (${emailResult.senderEmail}) के लिए Gmail SMTP प्रमाणीकरण (Google App Password) सेट नहीं है।`,
-        });
+      if (!emailResult.success) {
+        return NextResponse.json(
+          { error: emailResult.error || 'ओटीपी ईमेल भेजने में समस्या। कृपया पुनः प्रयास करें।' },
+          { status: 500 }
+        );
       }
+
+      return NextResponse.json({
+        success: true,
+        emailDelivered: true,
+        senderEmail: emailResult.senderEmail,
+        recipientEmail: normalizedEmail,
+        message: `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${normalizedEmail}) पर प्रेषक (${emailResult.senderEmail}) द्वारा सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`,
+      });
     }
 
     // ACTION 2: VERIFY OTP

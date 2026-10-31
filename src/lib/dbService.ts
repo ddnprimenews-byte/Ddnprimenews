@@ -31,11 +31,31 @@ export interface ContactMessage {
 }
 
 /**
+ * Deep merge articles avoiding duplicate IDs and preserving non-mutating immutability
+ */
+export function mergeArticles(baseList: Article[], newList: Article[]): Article[] {
+  const map = new Map<string, Article>();
+  for (const item of baseList) {
+    if (item && item.id) map.set(item.id, { ...item });
+  }
+  for (const item of newList) {
+    if (item && item.id) map.set(item.id, { ...item });
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.isLead && !b.isLead) return -1;
+    if (!a.isLead && b.isLead) return 1;
+    const timeA = new Date(a.datePublished || a.dateModified || 0).getTime();
+    const timeB = new Date(b.datePublished || b.dateModified || 0).getTime();
+    return timeB - timeA;
+  });
+}
+
+/**
  * 1. News Service: Universal Article Operations
  */
 export const NewsService = {
   /**
-   * Fetch articles from Firestore with automatic fallback to INITIAL_ARTICLES
+   * Fetch articles from Firestore with automatic merging with INITIAL_ARTICLES
    */
   async getArticles(options: ArticleFilterOptions = {}): Promise<Article[]> {
     const { category, search, status = 'published', limit = 50 } = options;
@@ -63,19 +83,19 @@ export const NewsService = {
       console.warn('NewsService Firestore query note (falling back to initial dataset):', err);
     }
 
-    // Fallback to static news if database returns no items
-    if (fetchedArticles.length === 0) {
-      fetchedArticles = INITIAL_ARTICLES.filter((a) => {
-        if (status !== 'all' && a.status !== status) return false;
-        if (category && category !== 'all' && category !== 'team' && a.category !== category) return false;
-        return true;
-      });
-    }
+    // Merge static baseline news with Firestore cloud articles (so new items prepend and never overwrite)
+    const baseline = INITIAL_ARTICLES.filter((a) => {
+      if (status !== 'all' && a.status !== status) return false;
+      if (category && category !== 'all' && category !== 'team' && a.category !== category) return false;
+      return true;
+    });
+
+    let result = mergeArticles(baseline, fetchedArticles);
 
     // Client-side text search if specified
     if (search && search.trim()) {
       const q = search.toLowerCase().trim();
-      fetchedArticles = fetchedArticles.filter(
+      result = result.filter(
         (a) =>
           a.title.toLowerCase().includes(q) ||
           a.summary.toLowerCase().includes(q) ||
@@ -84,7 +104,7 @@ export const NewsService = {
       );
     }
 
-    return fetchedArticles.slice(0, limit);
+    return result.slice(0, limit);
   },
 
   /**

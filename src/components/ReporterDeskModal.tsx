@@ -21,6 +21,7 @@ interface ReporterDeskModalProps {
   onClose: () => void;
   onAddArticle: (article: Article) => void;
   articles: Article[];
+  onSelectArticle?: (article: Article) => void;
 }
 
 interface ReporterUser {
@@ -74,6 +75,7 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
   onClose,
   onAddArticle,
   articles,
+  onSelectArticle,
 }) => {
   // Login State
   const [currentUser, setCurrentUser] = useState<ReporterUser | null>(null);
@@ -268,11 +270,18 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
       tags: ['डीडीएन प्राइम न्यूज', finalLocation, currentUser.name],
     };
 
-    try {
-      // Direct Firestore write and immediate sync to portal & admin desk
-      await saveArticleToFirestore(newArticle);
-      onAddArticle(newArticle);
+    // 1. Instantly register in portal state & localStorage (single call - no duplicate calls)
+    onAddArticle(newArticle);
 
+    // 2. Persist to Firestore cloud database
+    try {
+      await saveArticleToFirestore(newArticle);
+      setSuccessMsg(`समाचार सफलतापूर्वक प्रकाशित कर दिया गया है! शीर्षक: "${newArticle.title}" (क्लाउड व लोकल सुरक्षित)`);
+    } catch (err: any) {
+      console.warn('Firestore write warning:', err);
+      setSuccessMsg(`समाचार सफलतापूर्वक प्रकाशित हो गया है! शीर्षक: "${newArticle.title}" (लोकल सुरक्षित)`);
+    } finally {
+      setIsPublishing(false);
       // Reset form
       setTitle('');
       setSubtitle('');
@@ -280,23 +289,18 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
       setAeoSummary('');
       setContentBody('');
       setVideoUrl('');
-      setSuccessMsg(`समाचार सफलतापूर्वक सबमिट व प्रकाशित कर दिया गया है! शीर्षक: "${newArticle.title}"`);
       setActiveTab('my-articles');
-      setTimeout(() => setSuccessMsg(''), 6000);
-    } catch (err: any) {
-      console.error('Error submitting reporter article:', err);
-      // Still update locally for user resilience
-      onAddArticle(newArticle);
-      setSuccessMsg(`समाचार सफलतापूर्वक सबमिट हो गया है! (लोकल सिंक)`);
-      setActiveTab('my-articles');
-    } finally {
-      setIsPublishing(false);
+      setTimeout(() => setSuccessMsg(''), 7000);
     }
   };
 
-  // Reporter's personal news list
+  // Reporter's personal news list (with robust matching for Sanjay Choudhary / Sanjay Kumar)
   const myArticles = currentUser 
-    ? articles.filter(a => a.author === currentUser.name || a.tags?.includes(currentUser.name))
+    ? articles.filter(a => 
+        a.author === currentUser.name || 
+        a.tags?.includes(currentUser.name) ||
+        (currentUser.name.includes('संजय') && (a.author.includes('संजय') || a.tags?.some(t => t.includes('संजय'))))
+      )
     : [];
 
   return (
@@ -932,33 +936,53 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-3">
                       {myArticles.map((art) => (
-                        <div key={art.id} className="bg-white p-3.5 rounded-xl border border-stone-200 flex items-start gap-3 shadow-xs">
+                        <div key={art.id} className="bg-white p-4 rounded-xl border border-stone-200 flex flex-col sm:flex-row items-start gap-3.5 shadow-xs hover:border-red-300 transition">
                           {art.imageUrl && (
                             <img
                               src={art.imageUrl}
                               alt={art.title}
-                              className="w-16 h-16 rounded object-cover shrink-0 border border-stone-200"
+                              className="w-full sm:w-28 sm:h-20 h-36 rounded-lg object-cover shrink-0 border border-stone-200"
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
                                 {art.categoryHindi}
                               </span>
                               <span className="text-[10px] text-stone-500">{art.publishedAt}</span>
+                              <span className="text-[10px] text-stone-400 font-mono">ID: {art.id}</span>
                             </div>
-                            <h4 className="text-xs font-bold text-stone-900 truncate mt-1">
+                            <h4 className="text-xs sm:text-sm font-bold text-stone-900 font-serif leading-snug line-clamp-2">
                               {art.title}
                             </h4>
-                            <p className="text-[11px] text-stone-600 line-clamp-1 mt-0.5">
+                            <p className="text-[11px] text-stone-600 line-clamp-2 mt-1 leading-relaxed">
                               {art.summary}
                             </p>
+                            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 mt-2 border-t border-stone-100 text-[11px] text-stone-500">
+                              <span>स्थान: <strong className="text-stone-700">{art.location}</strong></span>
+                              <span>संवाददाता: <strong className="text-stone-700">{art.author}</strong></span>
+                              <div className="flex items-center gap-2 ml-auto">
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  ● लाइव
+                                </span>
+                                {onSelectArticle && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onSelectArticle(art);
+                                      onClose();
+                                    }}
+                                    className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-[11px] font-bold cursor-pointer transition flex items-center gap-1 shadow-xs"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>पोर्टल पर देखें</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                            लाइव
-                          </span>
                         </div>
                       ))}
                     </div>

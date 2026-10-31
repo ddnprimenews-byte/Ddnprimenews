@@ -9,6 +9,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Article, NewsCategory, WeatherData, LegalPageType } from '../types/news';
 import { INITIAL_ARTICLES, BREAKING_NEWS_ITEMS, INITIAL_WEATHER, VIDEO_BULLETINS } from '../data/newsData';
 import { SITE_CONFIG, getCanonicalUrl } from '../config/site';
+import { mergeArticles } from '../lib/dbService';
 
 import { TopBar } from './TopBar';
 import { Header } from './Header';
@@ -92,22 +93,45 @@ export default function App({
   // Newsletter subscription state
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
-  // Real-time Firestore sync & connection test
+  // Client-side instant cache restoration & Real-time Firestore sync
   useEffect(() => {
+    // 1. Restore any previously published articles from localStorage so page reload NEVER loses articles
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('ddn_custom_articles');
+        if (stored) {
+          const parsed = JSON.parse(stored) as Article[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setArticles((prev) => mergeArticles(prev, parsed));
+          }
+        }
+      } catch (e) {
+        console.warn('LocalStorage restore error:', e);
+      }
+    }
+
     let unsubscribeArticles: (() => void) | undefined;
     let unsubscribeBreaking: (() => void) | undefined;
 
     import('../lib/firebase').then(({ testConnection, subscribeToArticles, subscribeToBreakingNews }) => {
       testConnection();
 
-      // Subscribe to real-time Firestore articles (authoritative source of truth)
+      // Subscribe to real-time Firestore articles (merging with local baseline & custom items)
       try {
         unsubscribeArticles = subscribeToArticles(
           (firestoreArticles) => {
             setIsArticlesLoading(false);
             if (firestoreArticles && firestoreArticles.length > 0) {
-              // Firestore is the sole source of truth for persistent articles
-              setArticles(firestoreArticles);
+              setArticles((prev) => {
+                const merged = mergeArticles(prev, firestoreArticles);
+                if (typeof window !== 'undefined') {
+                  try {
+                    const custom = merged.filter((a) => !INITIAL_ARTICLES.some((init) => init.id === a.id));
+                    localStorage.setItem('ddn_custom_articles', JSON.stringify(custom));
+                  } catch (e) {}
+                }
+                return merged;
+              });
             }
           },
           (err) => {
@@ -279,14 +303,34 @@ export default function App({
     }
   };
 
-  // Add Article (Draft or Published) - 100% Firebase Firestore authoritatively
+  // Add Article (Draft or Published) - Merged immutably with Firestore & LocalStorage persistence
   const handleAddArticle = (newArt: Article) => {
-    setArticles((prev) => [newArt, ...prev]);
+    setArticles((prev) => {
+      const merged = mergeArticles([newArt], prev);
+      if (typeof window !== 'undefined') {
+        try {
+          const custom = merged.filter((a) => !INITIAL_ARTICLES.some((init) => init.id === a.id));
+          localStorage.setItem('ddn_custom_articles', JSON.stringify(custom));
+        } catch (e) {
+          console.warn('LocalStorage save error:', e);
+        }
+      }
+      return merged;
+    });
   };
 
-  // Delete Article - 100% Firebase Firestore
+  // Delete Article - Sync with LocalStorage & state
   const handleDeleteArticle = (id: string) => {
-    setArticles((prev) => prev.filter((a) => a.id !== id));
+    setArticles((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      if (typeof window !== 'undefined') {
+        try {
+          const custom = updated.filter((a) => !INITIAL_ARTICLES.some((init) => init.id === a.id));
+          localStorage.setItem('ddn_custom_articles', JSON.stringify(custom));
+        } catch (e) {}
+      }
+      return updated;
+    });
   };
 
   // Add Breaking News - 100% Firebase Firestore
@@ -1013,6 +1057,7 @@ export default function App({
         onClose={() => setIsReporterLoginOpen(false)}
         onAddArticle={handleAddArticle}
         articles={articles}
+        onSelectArticle={handleSelectArticle}
       />
 
       <EPaperModal

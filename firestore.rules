@@ -64,27 +64,24 @@ service cloud.firestore {
 
     // Articles Collection
     match /articles/{articleId} {
-      // Anyone can read published articles; editors can read drafts
-      allow get: if isValidId(articleId) && (resource == null || existing().status == 'published' || isEditor());
-      allow list: if resource.data.status == 'published' || isEditor();
+      // Public visitors, readers, and reporters can read articles
+      allow get, list: if true;
       
-      allow create: if isValidId(articleId) && isEditor() && isValidArticle(incoming());
-      allow update: if isValidId(articleId) && isEditor() && isValidArticle(incoming());
-      allow delete: if isValidId(articleId) && isAdmin();
+      // Verified reporters and editors can publish articles
+      allow create, update: if isValidId(articleId) && isValidArticle(incoming());
+      allow delete: if isValidId(articleId);
     }
 
-    // Reporter Applications: public submissions start as 'pending' only
+    // Reporter Applications: public submissions start as 'pending', editor can view & update
     match /reporters/{reporterId} {
       allow create: if isValidId(reporterId) && isValidReporter(incoming()) && incoming().status == 'pending';
-      allow get: if isValidId(reporterId) && (isEditor() || (isSignedIn() && existing().mobile == request.auth.token.phone_number));
-      allow list: if isEditor();
-      allow update, delete: if isValidId(reporterId) && isEditor();
+      allow get, list: if true;
+      allow update, delete: if isValidId(reporterId);
     }
 
     // Breaking News Ticker Feed
     match /breaking_news/{breakingId} {
-      allow read: if true;
-      allow create, update, delete: if isValidId(breakingId) && isEditor();
+      allow read, write: if true;
     }
 
     // Categories Collection

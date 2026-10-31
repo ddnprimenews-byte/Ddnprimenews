@@ -90,7 +90,7 @@ export async function sendOtpEmail(recipientEmail: string, otpCode: string): Pro
           <span class="badge">सुरक्षा सत्यापन कोड / EMAIL OTP</span>
           <h2 style="font-size: 18px; margin: 0 0 10px; color: #0f172a;">नमस्कार,</h2>
           <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-            डीडीएन प्राइम न्यूज़ के पत्रकार/रिपोर्टर पंजीकरण पोर्टल पर आपकी ईमेल आईडी के सत्यापन हेतु 6 अंकों का सुरक्षा कोड (OTP) नीचे दिया गया है:
+            डीडीएन प्राइम न्यूज़ के पत्रकार/रिपोर्टर पंजीकरण पोर्टल पर आपके द्वारा दर्ज ईमेल (<strong style="color: #991b1b;">${recipientEmail}</strong>) के सत्यापन हेतु 6 अंकों का सुरक्षा कोड (OTP) नीचे दिया गया है:
           </p>
           
           <div class="otp-box">
@@ -100,7 +100,7 @@ export async function sendOtpEmail(recipientEmail: string, otpCode: string): Pro
           </div>
 
           <p class="notice">
-            🔒 <strong>सुरक्षा सूचना:</strong> कृपया यह सुरक्षा कोड किसी अन्य व्यक्ति के साथ साझा न करें। यदि आपने इस सत्यापन का अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।
+            🔒 <strong>सुरक्षा सूचना:</strong> यह ईमेल केवल <strong>${recipientEmail}</strong> के लिए भेजा गया है। कृपया यह सुरक्षा कोड किसी अन्य व्यक्ति के साथ साझा न करें।
           </p>
         </div>
         <div class="footer">
@@ -119,19 +119,21 @@ export async function sendOtpEmail(recipientEmail: string, otpCode: string): Pro
   `;
 
   try {
+    const cleanRecipient = recipientEmail.trim().toLowerCase();
     const info = await transporter.sendMail({
       from: fromEmail,
-      to: recipientEmail,
+      to: cleanRecipient,
+      replyTo: 'ddnprimenews@gmail.com',
       subject: `🔒 ${otpCode} — डीडीएन प्राइम न्यूज़ रिपोर्टर सत्यापन कोड (Email OTP)`,
       html: htmlContent,
       text: `डीडीएन प्राइम न्यूज़ पत्रकार सत्यापन कोड (OTP): ${otpCode}। यह कोड 10 मिनट के लिए मान्य है।`,
     });
-    console.log(`[EmailService] OTP email successfully dispatched to ${recipientEmail}. MessageId:`, info?.messageId);
+    console.log(`[EmailService] OTP email successfully dispatched to ${cleanRecipient}. MessageId:`, info?.messageId);
     return {
       success: true,
-      message: `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${recipientEmail}) पर प्रेषक (${senderEmail}) द्वारा सफलतापूर्वक भेज दिया गया है।`,
+      message: `सत्यापन कोड (OTP) आवेदक की ईमेल आईडी (${cleanRecipient}) पर सफलतापूर्वक भेज दिया गया है।`,
       senderEmail,
-      recipientEmail,
+      recipientEmail: cleanRecipient,
     };
   } catch (err: any) {
     const isAuth = err.message?.includes('530') || err.message?.toLowerCase().includes('auth') || err.message?.toLowerCase().includes('credential');

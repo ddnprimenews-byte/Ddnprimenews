@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         emailDelivered: true,
         senderEmail: emailResult.senderEmail,
         recipientEmail: normalizedEmail,
-        message: `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${normalizedEmail}) पर प्रेषक (${emailResult.senderEmail}) द्वारा सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`,
+        message: `सत्यापन कोड (OTP) आवेदक की ईमेल आईडी (${normalizedEmail}) पर सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`,
       });
     }
 

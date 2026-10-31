@@ -119,6 +119,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
     handleSubmit,
     setValue,
     watch,
+    getValues,
     formState: { errors, isSubmitting },
     reset: resetHookForm,
   } = useForm<ReporterApplicationInput>({
@@ -209,9 +210,9 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
     setOtpError('');
     setOtpSuccess('');
 
-    const emailToVerify = currentEmail?.trim();
+    const emailToVerify = (getValues('email') || currentEmail || '')?.trim().toLowerCase();
     if (!emailToVerify || !emailToVerify.includes('@')) {
-      setOtpError('कृपया पहले एक मान्य ईमेल पता दर्ज करें।');
+      setOtpError('कृपया पहले आवेदक की मान्य ईमेल आईडी दर्ज करें।');
       return;
     }
 
@@ -232,7 +233,7 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
       setOtpSent(true);
       setCountdown(60);
       setOtpSuccess(
-        data.message || `सत्यापन कोड (OTP) आपकी ईमेल आईडी (${emailToVerify}) पर प्रेषक (ddnprimenews@gmail.com) द्वारा सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`
+        data.message || `सत्यापन कोड (OTP) आवेदक की ईमेल आईडी (${emailToVerify}) पर सफलतापूर्वक भेज दिया गया है। कृपया अपना इनबॉक्स या स्पैम (Spam) फोल्डर देखें।`
       );
     } catch (err: any) {
       setOtpError('ओटीपी सेवा से संपर्क नहीं हो सका: ' + err.message);
@@ -662,9 +663,9 @@ export const ReporterApplicationModal: React.FC<ReporterApplicationModalProps> =
                           <Lock className="w-3.5 h-3.5 text-red-600" />
                           <span>6 अंकों का ओटीपी (OTP) दर्ज करें:</span>
                         </span>
-                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                        <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
                           <Mail className="w-3 h-3 text-emerald-600" />
-                          <span>प्रेषक: ddnprimenews@gmail.com</span>
+                          <span>भेजा गया: <strong className="text-stone-900">{currentEmail?.trim() || 'आवेदक के ईमेल पर'}</strong></span>
                         </span>
                       </div>
 

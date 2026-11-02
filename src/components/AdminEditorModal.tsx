@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Article, NewsCategory, ReporterApplication } from '../types/news';
 import { 
   X, PlusCircle, Trash2, CheckCircle2, ShieldCheck, 
   PenTool, AlertCircle, FileCheck, LogIn, LogOut, 
   UserCheck, Users, ExternalLink, Printer, Sparkles, Loader2,
-  Flag, MapPin, Compass, Eye
+  Flag, MapPin, Compass, Eye, Edit3, Search, Video, ArrowLeft, RefreshCw
 } from 'lucide-react';
 import { 
   auth, signInWithGoogle, signOutUser, 
@@ -29,9 +29,11 @@ interface AdminEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddArticle: (article: Article) => void;
+  onUpdateArticle?: (article: Article) => void;
   onAddBreakingNews: (text: string) => void;
   articles: Article[];
   onDeleteArticle: (id: string) => void;
+  onSelectArticle?: (article: Article) => void;
 }
 
 interface AdminUserSession {
@@ -44,9 +46,11 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   isOpen,
   onClose,
   onAddArticle,
+  onUpdateArticle,
   onAddBreakingNews,
   articles,
   onDeleteArticle,
+  onSelectArticle,
 }) => {
   const [currentUser, setCurrentUser] = useState<AdminUserSession | null>(() => {
     if (typeof window !== 'undefined') {
@@ -77,6 +81,27 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   const [isLoadingReporters, setIsLoadingReporters] = useState(false);
   const [selectedReporterForCard, setSelectedReporterForCard] = useState<ReporterApplication | null>(null);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; title: string; type: 'photo' | 'id' } | null>(null);
+
+  // Tab 4 (Manage Articles) state: Reporter Articles vs Admin Articles
+  const [manageSubTab, setManageSubTab] = useState<'reporter' | 'admin'>('reporter');
+  const [reporterSearchQuery, setReporterSearchQuery] = useState('');
+  const [selectedReporterFilter, setSelectedReporterFilter] = useState('all');
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+
+  // Editing Article State (Full Update with YouTube Embed for Admin)
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSubtitle, setEditSubtitle] = useState('');
+  const [editSummary, setEditSummary] = useState('');
+  const [editCategory, setEditCategory] = useState<NewsCategory>('bihar');
+  const [editLocation, setEditLocation] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
+  const [editAuthorRole, setEditAuthorRole] = useState('');
+  const [editContentBody, setEditContentBody] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editStatus, setEditStatus] = useState<'published' | 'draft'>('published');
+  const [isUpdatingArticle, setIsUpdatingArticle] = useState(false);
 
   // Form for new article
   const [title, setTitle] = useState('');
@@ -326,6 +351,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
       status: articleStatus,
       views: 120,
       tags: ['डीडीएन प्राइम न्यूज', finalLocation],
+      createdByRole: 'admin',
     };
 
     try {
@@ -397,11 +423,155 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
     try {
       await deleteArticleFromFirestore(id);
       onDeleteArticle(id);
+      if (editingArticle?.id === id) {
+        setEditingArticle(null);
+      }
       setSuccessMsg('समाचार फायरस्टोर डेटाबेस से सफलतापूर्वक हटा दिया गया।');
     } catch (err: any) {
       setSuccessMsg('त्रुटि: समाचार हटाया नहीं जा सका।');
     }
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Helper to distinguish Reporter Articles vs Admin Articles
+  const isReporterArt = (a: Article): boolean => {
+    if (a.createdByRole === 'reporter') return true;
+    if (a.createdByRole === 'admin') return false;
+    if (a.reporterId || a.reporterName) return true;
+    if (a.authorRole?.includes('संवाददाता')) return true;
+    if (a.publishedAt?.includes('रिपोर्टर')) return true;
+    if (a.author?.includes('संजय') || a.author?.includes('अमित आनंद')) return true;
+    if (a.authorRole?.includes('संपादक') || a.author?.includes('राजेश') || a.author?.includes('मुख्य संपादक')) {
+      return false;
+    }
+    return false;
+  };
+
+  const reporterArticles = useMemo(() => {
+    return articles.filter(isReporterArt);
+  }, [articles]);
+
+  const adminArticles = useMemo(() => {
+    return articles.filter((a) => !isReporterArt(a));
+  }, [articles]);
+
+  // Distinct reporter names for 1-click filter chips
+  const distinctReporters = useMemo(() => {
+    const set = new Set<string>();
+    reporterArticles.forEach((a) => {
+      if (a.author && a.author.trim()) set.add(a.author.trim());
+      if (a.reporterName && a.reporterName.trim()) set.add(a.reporterName.trim());
+    });
+    return Array.from(set).filter(Boolean);
+  }, [reporterArticles]);
+
+  // Filtered Reporter Articles (by reporter search query + selected chip)
+  const filteredReporterArticles = useMemo(() => {
+    let list = reporterArticles;
+    if (selectedReporterFilter !== 'all') {
+      list = list.filter(
+        (a) => a.author === selectedReporterFilter || a.reporterName === selectedReporterFilter
+      );
+    }
+    if (reporterSearchQuery.trim()) {
+      const q = reporterSearchQuery.toLowerCase().trim();
+      list = list.filter((a) =>
+        (a.author || '').toLowerCase().includes(q) ||
+        (a.reporterName || '').toLowerCase().includes(q) ||
+        (a.title || '').toLowerCase().includes(q) ||
+        (a.location || '').toLowerCase().includes(q) ||
+        (a.summary || '').toLowerCase().includes(q) ||
+        (a.categoryHindi || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [reporterArticles, selectedReporterFilter, reporterSearchQuery]);
+
+  // Filtered Admin Articles (by search query)
+  const filteredAdminArticles = useMemo(() => {
+    let list = adminArticles;
+    if (adminSearchQuery.trim()) {
+      const q = adminSearchQuery.toLowerCase().trim();
+      list = list.filter((a) =>
+        (a.title || '').toLowerCase().includes(q) ||
+        (a.location || '').toLowerCase().includes(q) ||
+        (a.summary || '').toLowerCase().includes(q) ||
+        (a.categoryHindi || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [adminArticles, adminSearchQuery]);
+
+  // Start Editing Article Handler
+  const startEditingArticle = (art: Article) => {
+    setEditingArticle(art);
+    setEditTitle(art.title || '');
+    setEditSubtitle(art.subtitle || '');
+    setEditSummary(art.summary || '');
+    setEditCategory(art.category || 'bihar');
+    setEditLocation(art.location || '');
+    setEditAuthor(art.author || '');
+    setEditAuthorRole(art.authorRole || '');
+    setEditContentBody(Array.isArray(art.content) ? art.content.join('\n\n') : String(art.content || ''));
+    setEditImageUrl(art.imageUrl || '/images/ddn_hero_news.jpg');
+    setEditVideoUrl(art.videoUrl || (art.youtubeId ? `https://www.youtube.com/watch?v=${art.youtubeId}` : ''));
+    setEditStatus(art.status || 'published');
+  };
+
+  // Save Updated Article (with YouTube Embed Handling)
+  const handleSaveUpdatedArticle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingArticle) return;
+    if (!editTitle.trim()) {
+      alert('कृपया समाचार का शीर्षक दर्ज करें।');
+      return;
+    }
+
+    setIsUpdatingArticle(true);
+    const cleanVideoUrl = editVideoUrl.trim();
+    const ytId = cleanVideoUrl ? extractYouTubeId(cleanVideoUrl) : null;
+
+    const categoryHindiMap: Record<string, string> = {
+      bihar: 'बिहार विशेष',
+      national: 'देश',
+      politics: 'राजनीति',
+      crime: 'अपराध',
+      'education-health': 'शिक्षा & हेल्थ',
+      sports: 'खेल',
+      entertainment: 'मनोरंजन एवं सिनेमा',
+    };
+
+    const updated: Article = {
+      ...editingArticle,
+      title: editTitle.trim(),
+      subtitle: editSubtitle.trim() || editSummary.trim(),
+      summary: editSummary.trim(),
+      category: editCategory,
+      categoryHindi: categoryHindiMap[editCategory] || editingArticle.categoryHindi || 'बिहार विशेष',
+      location: editLocation.trim() || editingArticle.location || 'दरभंगा',
+      author: editAuthor.trim() || editingArticle.author,
+      authorRole: editAuthorRole.trim() || editingArticle.authorRole,
+      content: editContentBody.trim() ? editContentBody.split('\n\n') : [editSummary.trim()],
+      imageUrl: editImageUrl || editingArticle.imageUrl || '/images/ddn_hero_news.jpg',
+      videoUrl: cleanVideoUrl || undefined,
+      youtubeId: ytId || undefined,
+      status: editStatus,
+      dateModified: new Date().toISOString(),
+    };
+
+    try {
+      await saveArticleToFirestore(updated);
+      onUpdateArticle?.(updated);
+      onAddArticle(updated);
+      setSuccessMsg(`समाचार "${updated.title}" सफलतापूर्वक अपडेट कर दिया गया (यूट्यूब वीडियो व विवरण सुरक्षित)!`);
+      setEditingArticle(null);
+    } catch (err: any) {
+      console.error('Update article error:', err);
+      setSuccessMsg('त्रुटि: समाचार अपडेट नहीं हो सका।');
+    } finally {
+      setIsUpdatingArticle(false);
+      setTimeout(() => setSuccessMsg(''), 5000);
+    }
   };
 
   return (
@@ -1086,31 +1256,564 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: MANAGE ARTICLES */}
+              {/* TAB 4: MANAGE ARTICLES - TWO PARTS: REPORTER & ADMIN */}
               {tab === 'manage' && (
-                <div className="space-y-3">
-                  <p className="text-xs text-stone-600">
-                    फायरस्टोर डेटाबेस में दर्ज समाचार आलेखों की सूची। यहां से समाचार हटाए या संशोधित किए जा सकते हैं।
-                  </p>
-                  <div className="divide-y divide-stone-200 max-h-96 overflow-y-auto">
-                    {articles.map((art) => (
-                      <div key={art.id} className="py-2.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <h5 className="font-semibold text-stone-900 text-xs truncate">{art.title}</h5>
-                          <span className="text-[10px] text-stone-400">
-                            {art.categoryHindi} | {art.location} | {art.publishedAt}
-                          </span>
+                <div className="space-y-4">
+                  {/* Mode 1: EDITING ARTICLE WITH SPECIAL YOUTUBE EMBED */}
+                  {editingArticle ? (
+                    <div className="bg-stone-50 p-4 sm:p-5 rounded-xl border border-stone-300 space-y-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-3 border-b border-stone-200">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingArticle(null)}
+                            className="p-1.5 rounded-lg bg-white hover:bg-stone-200 text-stone-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition border border-stone-300 shadow-2xs"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>वापस सूची</span>
+                          </button>
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-stone-900 flex items-center gap-2">
+                              <span>समाचार संपादन एवं यूट्यूब इम्बेड</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                isReporterArt(editingArticle) ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'
+                              }`}>
+                                {isReporterArt(editingArticle) ? `संवाददाता: ${editingArticle.author}` : 'मुख्य संपादक आलेख'}
+                              </span>
+                            </h4>
+                            <span className="text-[10px] font-mono text-stone-400">ID: {editingArticle.id}</span>
+                          </div>
                         </div>
                         <button
-                          onClick={() => handleDeleteArticle(art.id)}
-                          className="p-1.5 text-stone-400 hover:text-red-600 rounded transition"
-                          title="समाचार हटाएं"
+                          type="button"
+                          onClick={() => setEditingArticle(null)}
+                          className="p-1 text-stone-400 hover:text-stone-700 text-xs rounded hover:bg-stone-200"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Edit Form */}
+                      <form onSubmit={handleSaveUpdatedArticle} className="space-y-4 text-xs">
+                        <div>
+                          <label className="block font-bold text-stone-700 mb-1">
+                            समाचार मुख्य शीर्षक (Headline) *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full p-2.5 text-sm border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white font-serif font-bold text-stone-900"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold text-stone-700 mb-1">श्रेणी (Category)</label>
+                            <select
+                              value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value as NewsCategory)}
+                              className="w-full p-2 text-xs border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white cursor-pointer font-medium"
+                            >
+                              <option value="bihar">📍 बिहार विशेष</option>
+                              <option value="national">🇮🇳 देश / राष्ट्रीय</option>
+                              <option value="politics">🏛️ राजनीति</option>
+                              <option value="crime">🚨 अपराध</option>
+                              <option value="education-health">📚 शिक्षा & स्वास्थ्य</option>
+                              <option value="sports">🏆 खेल</option>
+                              <option value="entertainment">🎬 मनोरंजन एवं सिनेमा</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-stone-700 mb-1">स्थान (Location)</label>
+                            <input
+                              type="text"
+                              value={editLocation}
+                              onChange={(e) => setEditLocation(e.target.value)}
+                              placeholder="उदा. दरभंगा, पटना, नई दिल्ली..."
+                              className="w-full p-2 text-xs border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-stone-700 mb-1">प्रकाशन स्थिति (Status)</label>
+                            <select
+                              value={editStatus}
+                              onChange={(e) => setEditStatus(e.target.value as 'published' | 'draft')}
+                              className="w-full p-2 text-xs border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white cursor-pointer"
+                            >
+                              <option value="published">लाइव प्रकाशित (Published)</option>
+                              <option value="draft">ड्राफ्ट सुरक्षित (Draft)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold text-stone-700 mb-1">संवाददाता / लेखक (Author)</label>
+                            <input
+                              type="text"
+                              value={editAuthor}
+                              onChange={(e) => setEditAuthor(e.target.value)}
+                              className="w-full p-2 text-xs border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-stone-700 mb-1">लेखक का पद (Role)</label>
+                            <input
+                              type="text"
+                              value={editAuthorRole}
+                              onChange={(e) => setEditAuthorRole(e.target.value)}
+                              placeholder="उदा. वरिष्ठ संवाददाता / मुख्य संपादक"
+                              className="w-full p-2 text-xs border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-stone-700 mb-1">
+                            संक्षिप्त विवरण (Executive Summary) *
+                          </label>
+                          <textarea
+                            rows={2}
+                            required
+                            value={editSummary}
+                            onChange={(e) => setEditSummary(e.target.value)}
+                            className="w-full p-2.5 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white leading-relaxed"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-stone-700 mb-1">
+                            विस्तृत समाचार सामग्री (Full Body Content)
+                          </label>
+                          <textarea
+                            rows={6}
+                            value={editContentBody}
+                            onChange={(e) => setEditContentBody(e.target.value)}
+                            placeholder="पैराग्राफ अलग करने के लिए दो बार Enter दबाएं..."
+                            className="w-full p-2.5 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white leading-relaxed font-sans"
+                          />
+                        </div>
+
+                        {/* SPECIAL YOUTUBE EMBED FEATURE FOR ADMIN */}
+                        <div className="p-4 bg-linear-to-r from-red-50 to-amber-50 rounded-xl border-2 border-red-300 space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-red-700 text-white rounded-lg">
+                                <Video className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h5 className="font-bold text-xs sm:text-sm text-stone-900 flex items-center gap-1.5">
+                                  <span>YouTube वीडियो इम्बेड (एडमिन विशेषाधिकार)</span>
+                                  <span className="text-[10px] bg-red-700 text-white px-2 py-0.5 rounded font-mono font-bold">
+                                    Admin Exclusive
+                                  </span>
+                                </h5>
+                                <p className="text-[11px] text-stone-600">
+                                  संवाददाता के इस समाचार में YouTube वीडियो बुलेटिन जोड़ें। रिपोर्टर को वीडियो जोड़ने का अधिकार नहीं है, परंतु मुख्य संपादक आवश्यकतानुसार वीडियो इम्बेड संलग्न कर सकते हैं।
+                                </p>
+                              </div>
+                            </div>
+                            {editVideoUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setEditVideoUrl('')}
+                                className="text-[11px] text-red-700 hover:text-red-900 font-bold hover:underline"
+                              >
+                                ✕ वीडियो हटाएं
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <input
+                              type="url"
+                              value={editVideoUrl}
+                              onChange={(e) => setEditVideoUrl(e.target.value)}
+                              placeholder="YouTube वीडियो लिंक या ID (उदा. https://www.youtube.com/watch?v=... या https://youtu.be/...)"
+                              className="w-full p-2.5 text-xs border border-stone-300 rounded-lg bg-white focus:border-red-700 focus:outline-none font-mono"
+                            />
+                            <p className="text-[10px] text-stone-500">
+                              यूट्यूब के सामान्य वीडियो, यूट्यूब शॉर्ट्स (Shorts) और लाइव बुलेटिन सभी समर्थित हैं।
+                            </p>
+                          </div>
+
+                          {/* Live YouTube Preview */}
+                          {editVideoUrl.trim() && (
+                            <div className="pt-2 border-t border-red-200">
+                              <p className="text-[11px] font-bold text-red-900 mb-1.5 flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-red-600" />
+                                <span>वीडियो लाइव प्रिव्यू (Live Embed Player):</span>
+                              </p>
+                              <div className="max-w-md mx-auto aspect-video rounded-lg overflow-hidden border border-stone-800 shadow-md">
+                                <YouTubeEmbed urlOrId={editVideoUrl.trim()} title={editTitle || 'वीडियो प्रिव्यू'} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Featured Image */}
+                        <div>
+                          <OptimizedImageUploader
+                            label="मुख्य तस्वीर बदलें (Featured 16:9 Banner)"
+                            aspectRatio="16:9"
+                            currentImageUrl={editImageUrl}
+                            onImageSelected={(res, url) => {
+                              setEditImageUrl(url || res.dataUrl);
+                            }}
+                          />
+                        </div>
+
+                        {/* Submit / Cancel Buttons */}
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-200">
+                          <button
+                            type="button"
+                            onClick={() => setEditingArticle(null)}
+                            className="px-4 py-2 border border-stone-300 text-stone-700 rounded-lg text-xs font-semibold hover:bg-stone-100 cursor-pointer"
+                          >
+                            रद्द करें
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isUpdatingArticle}
+                            className="px-6 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                          >
+                            {isUpdatingArticle ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>अपडेट हो रहा है...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>समाचार अपडेट एवं सुरक्षित करें (Save & Update)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    /* Mode 2: TWO-PART ARTICLES LIST (REPORTER vs ADMIN) */
+                    <div className="space-y-4">
+                      {/* Sub-Tabs Header */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-2 border-b border-stone-200">
+                        <div className="inline-flex p-1 bg-stone-100 rounded-xl border border-stone-200">
+                          <button
+                            type="button"
+                            onClick={() => setManageSubTab('reporter')}
+                            className={`py-2 px-4 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                              manageSubTab === 'reporter'
+                                ? 'bg-blue-700 text-white shadow-xs'
+                                : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                          >
+                            <Users className="w-4 h-4" />
+                            <span>रिपोर्टर समाचार ({reporterArticles.length})</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setManageSubTab('admin')}
+                            className={`py-2 px-4 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                              manageSubTab === 'admin'
+                                ? 'bg-red-800 text-white shadow-xs'
+                                : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>एडमिन समाचार ({adminArticles.length})</span>
+                          </button>
+                        </div>
+
+                        <div className="text-[11px] text-stone-500 font-medium">
+                          कुल समाचार: <strong>{articles.length}</strong> | अधिकार: <strong>एडिट, अपडेट व डिलीट (केवल एडमिन)</strong>
+                        </div>
+                      </div>
+
+                      {/* PART 1: REPORTER ARTICLES */}
+                      {manageSubTab === 'reporter' && (
+                        <div className="space-y-3">
+                          {/* Search Bar & Reporter Filtering */}
+                          <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 space-y-2.5">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <div className="relative flex-1">
+                                <Search className="w-4 h-4 text-blue-700 absolute left-3 top-2.5" />
+                                <input
+                                  type="text"
+                                  value={reporterSearchQuery}
+                                  onChange={(e) => setReporterSearchQuery(e.target.value)}
+                                  placeholder="रिपोर्टर का नाम (उदा. संजय चौधरी, अमित) या शीर्षक से खोजें..."
+                                  className="w-full pl-9 pr-8 py-2 text-xs border border-blue-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-stone-900 placeholder-stone-400"
+                                />
+                                {reporterSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setReporterSearchQuery('')}
+                                    className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+
+                              {selectedReporterFilter !== 'all' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedReporterFilter('all')}
+                                  className="px-2.5 py-2 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded-lg shrink-0 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>फ़िल्टर हटाएं</span>
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Quick Reporter Name Filter Chips */}
+                            {distinctReporters.length > 0 && (
+                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[11px]">
+                                <span className="text-stone-500 font-semibold">रिपोर्टर चुनें:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedReporterFilter('all')}
+                                  className={`px-2.5 py-0.5 rounded-full font-medium transition cursor-pointer ${
+                                    selectedReporterFilter === 'all'
+                                      ? 'bg-blue-700 text-white'
+                                      : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-50'
+                                  }`}
+                                >
+                                  सभी ({reporterArticles.length})
+                                </button>
+                                {distinctReporters.map((repName) => {
+                                  const count = reporterArticles.filter((a) => a.author === repName || a.reporterName === repName).length;
+                                  return (
+                                    <button
+                                      key={repName}
+                                      type="button"
+                                      onClick={() => setSelectedReporterFilter(repName)}
+                                      className={`px-2.5 py-0.5 rounded-full font-medium transition cursor-pointer flex items-center gap-1 ${
+                                        selectedReporterFilter === repName
+                                          ? 'bg-blue-700 text-white'
+                                          : 'bg-white text-blue-900 border border-blue-200 hover:bg-blue-50'
+                                      }`}
+                                    >
+                                      <span>{repName}</span>
+                                      <span className="text-[10px] opacity-80 font-mono">({count})</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reporter Articles List */}
+                          {filteredReporterArticles.length === 0 ? (
+                            <div className="p-8 text-center bg-stone-50 rounded-xl border border-stone-200 text-stone-500 text-xs space-y-1">
+                              <Users className="w-8 h-8 text-stone-400 mx-auto" />
+                              <p className="font-bold text-stone-700">कोई रिपोर्टर समाचार नहीं मिला।</p>
+                              <p className="text-[11px]">खोज शब्द बदलें या संवाददाता द्वारा खबर प्रेषित होने की प्रतीक्षा करें।</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+                              {filteredReporterArticles.map((art) => (
+                                <div
+                                  key={art.id}
+                                  className="p-3 bg-white hover:bg-stone-50 rounded-xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition shadow-2xs"
+                                >
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    {art.imageUrl && (
+                                      <img
+                                        src={art.imageUrl}
+                                        alt={art.title}
+                                        className="w-16 h-12 rounded object-cover shrink-0 border border-stone-200"
+                                      />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap mb-1 text-[10px]">
+                                        <span className="font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                          संवाददाता: {art.author}
+                                        </span>
+                                        <span className="font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                                          {art.categoryHindi}
+                                        </span>
+                                        <span className="text-stone-500">{art.location}</span>
+                                        <span className="text-stone-400 font-mono">· {art.publishedAt}</span>
+                                        {(art.youtubeId || art.videoUrl) && (
+                                          <span className="font-bold px-1.5 py-0.5 rounded bg-red-600 text-white flex items-center gap-1">
+                                            <Video className="w-2.5 h-2.5" />
+                                            <span>यूट्यूब वीडियो संलग्न</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h5 className="font-bold text-stone-900 text-xs sm:text-sm font-serif line-clamp-1 leading-snug">
+                                        {art.title}
+                                      </h5>
+                                      <p className="text-[11px] text-stone-600 line-clamp-1 mt-0.5">
+                                        {art.summary}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* 3 Action Buttons: Edit & Update (with YouTube embed), View on Portal, Delete */}
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingArticle(art)}
+                                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                      title="एडिट करें व यूट्यूब वीडियो जोड़ें"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                                      <span>एडिट / वीडियो</span>
+                                    </button>
+
+                                    {onSelectArticle && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          onSelectArticle(art);
+                                          onClose();
+                                        }}
+                                        className="p-1.5 text-stone-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-stone-200 transition cursor-pointer"
+                                        title="पोर्टल पर लाइव देखें"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteArticle(art.id)}
+                                      className="p-1.5 text-stone-400 hover:text-red-700 hover:bg-red-50 rounded border border-stone-200 transition cursor-pointer"
+                                      title="समाचार हटाएं (Delete - केवल एडमिन)"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* PART 2: ADMIN ARTICLES */}
+                      {manageSubTab === 'admin' && (
+                        <div className="space-y-3">
+                          {/* Search Bar for Admin Articles */}
+                          <div className="relative">
+                            <Search className="w-4 h-4 text-red-700 absolute left-3 top-2.5" />
+                            <input
+                              type="text"
+                              value={adminSearchQuery}
+                              onChange={(e) => setAdminSearchQuery(e.target.value)}
+                              placeholder="एडमिन समाचार शीर्षक, लोकेशन या श्रेणी से खोजें..."
+                              className="w-full pl-9 pr-8 py-2 text-xs border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900 placeholder-stone-400"
+                            />
+                            {adminSearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => setAdminSearchQuery('')}
+                                className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 text-xs"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Admin Articles List */}
+                          {filteredAdminArticles.length === 0 ? (
+                            <div className="p-8 text-center bg-stone-50 rounded-xl border border-stone-200 text-stone-500 text-xs space-y-1">
+                              <ShieldCheck className="w-8 h-8 text-stone-400 mx-auto" />
+                              <p className="font-bold text-stone-700">कोई एडमिन समाचार नहीं मिला।</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+                              {filteredAdminArticles.map((art) => (
+                                <div
+                                  key={art.id}
+                                  className="p-3 bg-white hover:bg-stone-50 rounded-xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition shadow-2xs"
+                                >
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    {art.imageUrl && (
+                                      <img
+                                        src={art.imageUrl}
+                                        alt={art.title}
+                                        className="w-16 h-12 rounded object-cover shrink-0 border border-stone-200"
+                                      />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap mb-1 text-[10px]">
+                                        <span className="font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">
+                                          मुख्य संपादक डेस्क
+                                        </span>
+                                        <span className="font-semibold px-1.5 py-0.5 rounded bg-stone-100 text-stone-700">
+                                          {art.categoryHindi}
+                                        </span>
+                                        <span className="text-stone-500">{art.location}</span>
+                                        <span className="text-stone-400 font-mono">· {art.publishedAt}</span>
+                                        {(art.youtubeId || art.videoUrl) && (
+                                          <span className="font-bold px-1.5 py-0.5 rounded bg-red-600 text-white flex items-center gap-1">
+                                            <Video className="w-2.5 h-2.5" />
+                                            <span>यूट्यूब वीडियो संलग्न</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h5 className="font-bold text-stone-900 text-xs sm:text-sm font-serif line-clamp-1 leading-snug">
+                                        {art.title}
+                                      </h5>
+                                      <p className="text-[11px] text-stone-600 line-clamp-1 mt-0.5">
+                                        {art.summary}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* 3 Action Buttons: Edit, View, Delete */}
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingArticle(art)}
+                                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                      title="एडिट करें"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                                      <span>एडिट / वीडियो</span>
+                                    </button>
+
+                                    {onSelectArticle && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          onSelectArticle(art);
+                                          onClose();
+                                        }}
+                                        className="p-1.5 text-stone-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-stone-200 transition cursor-pointer"
+                                        title="पोर्टल पर लाइव देखें"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteArticle(art.id)}
+                                      className="p-1.5 text-stone-400 hover:text-red-700 hover:bg-red-50 rounded border border-stone-200 transition cursor-pointer"
+                                      title="समाचार हटाएं (Delete)"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

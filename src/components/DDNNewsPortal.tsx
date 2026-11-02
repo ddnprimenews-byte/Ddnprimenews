@@ -343,6 +343,24 @@ export default function App({
     });
   };
 
+  // Update Article (Edit by Admin)
+  const handleUpdateArticle = (updatedArt: Article) => {
+    setArticles((prev) => {
+      const list = prev.map((a) => (a.id === updatedArt.id ? updatedArt : a));
+      if (!list.some((a) => a.id === updatedArt.id)) {
+        list.unshift(updatedArt);
+      }
+      const cleanMerged = mergeArticles([], list);
+      if (typeof window !== 'undefined') {
+        try {
+          const custom = cleanMerged.filter((a) => !INITIAL_ARTICLES.some((init) => init.id === a.id));
+          localStorage.setItem('ddn_custom_articles', JSON.stringify(custom));
+        } catch (e) {}
+      }
+      return cleanMerged;
+    });
+  };
+
   // Add Breaking News - 100% Firebase Firestore
   const handleAddBreaking = (text: string) => {
     setBreakingNews((prev) => [text, ...prev]);
@@ -1087,9 +1105,11 @@ export default function App({
         isOpen={isAdminDeskOpen}
         onClose={() => setIsAdminDeskOpen(false)}
         onAddArticle={handleAddArticle}
+        onUpdateArticle={handleUpdateArticle}
         onAddBreakingNews={handleAddBreaking}
         articles={articles}
         onDeleteArticle={handleDeleteArticle}
+        onSelectArticle={handleSelectArticle}
       />
     </div>
   );

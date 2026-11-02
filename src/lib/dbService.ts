@@ -112,6 +112,9 @@ export function sanitizeArticle(raw: any): Article {
     sections: Array.isArray(raw.sections) ? raw.sections : undefined,
     youtubeId: typeof raw.youtubeId === 'string' ? raw.youtubeId : undefined,
     videoUrl: typeof raw.videoUrl === 'string' ? raw.videoUrl : undefined,
+    createdByRole: raw.createdByRole === 'reporter' ? 'reporter' : raw.createdByRole === 'admin' ? 'admin' : undefined,
+    reporterId: typeof raw.reporterId === 'string' ? raw.reporterId : undefined,
+    reporterName: typeof raw.reporterName === 'string' ? raw.reporterName : undefined,
   };
 }
 

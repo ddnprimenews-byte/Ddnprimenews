@@ -268,6 +268,9 @@ export const ReporterDeskModal: React.FC<ReporterDeskModalProps> = ({
       status: 'published',
       views: 1,
       tags: ['डीडीएन प्राइम न्यूज', finalLocation, currentUser.name],
+      createdByRole: 'reporter',
+      reporterId: currentUser.id,
+      reporterName: currentUser.name,
     };
 
     // 1. Instantly register in portal state & localStorage (single call - no duplicate calls)

@@ -55,6 +55,9 @@ export interface Article {
   faqs?: ArticleFAQ[];
   videoUrl?: string;
   youtubeId?: string;
+  createdByRole?: 'admin' | 'reporter';
+  reporterId?: string;
+  reporterName?: string;
 }
 
 export interface WeatherData {

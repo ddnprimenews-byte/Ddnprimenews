@@ -242,6 +242,39 @@ export async function updateReporterStatusInFirestore(
   }
 }
 
+// Full Edit/Update Reporter Application in Firestore by Admin
+export async function updateReporterApplicationInFirestore(
+  id: string,
+  updatedData: Partial<ReporterApplication>
+): Promise<void> {
+  const docRef = doc(db, 'reporters', id);
+  try {
+    // Exclude undefined values and update timestamp
+    const cleanData: Record<string, any> = {};
+    Object.entries(updatedData).forEach(([key, val]) => {
+      if (val !== undefined) cleanData[key] = val;
+    });
+    cleanData.lastModifiedBy = auth.currentUser?.email || 'admin';
+    cleanData.lastModifiedAt = serverTimestamp();
+
+    await updateDoc(docRef, cleanData);
+    console.log(`Reporter application ${id} successfully updated by Admin in Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `reporters/${id}`);
+  }
+}
+
+// Delete Reporter Application from Firestore by Admin
+export async function deleteReporterApplicationFromFirestore(id: string): Promise<void> {
+  const docRef = doc(db, 'reporters', id);
+  try {
+    await deleteDoc(docRef);
+    console.log(`Reporter application ${id} permanently deleted from Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `reporters/${id}`);
+  }
+}
+
 // Upload reporter photo to Firebase Storage with size & type validation
 export async function uploadReporterPhoto(file: File, candidateId: string): Promise<string> {
   // Validate file type

@@ -6,18 +6,22 @@ import {
   X, PlusCircle, Trash2, CheckCircle2, ShieldCheck, 
   PenTool, AlertCircle, FileCheck, LogIn, LogOut, 
   UserCheck, Users, ExternalLink, Printer, Sparkles, Loader2,
-  Flag, MapPin, Compass, Eye, Edit3, Search, Video, ArrowLeft, RefreshCw
+  Flag, MapPin, Compass, Eye, Edit3, Search, Video, ArrowLeft, RefreshCw,
+  Award, FileText, UserX, Check, Edit2, Download
 } from 'lucide-react';
 import { 
   auth, signInWithGoogle, signOutUser, 
   saveArticleToFirestore, deleteArticleFromFirestore, 
   addBreakingNewsToFirestore, fetchReporterApplications, 
-  updateReporterStatusInFirestore 
+  updateReporterStatusInFirestore,
+  updateReporterApplicationInFirestore,
+  deleteReporterApplicationFromFirestore
 } from '../lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { OptimizedImageUploader } from './OptimizedImageUploader';
 import { YouTubeEmbed } from './YouTubeEmbed';
 import { extractYouTubeId } from '../lib/mediaOptimization';
+import { ReporterIdCardModal } from './ReporterIdCardModal';
 import { 
   BIHAR_DISTRICTS, 
   INDIA_STATES, 
@@ -80,7 +84,31 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   const [reporterApps, setReporterApps] = useState<ReporterApplication[]>([]);
   const [isLoadingReporters, setIsLoadingReporters] = useState(false);
   const [selectedReporterForCard, setSelectedReporterForCard] = useState<ReporterApplication | null>(null);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; title: string; type: 'photo' | 'id' } | null>(null);
+
+  // Reporter filtering and searching
+  const [reporterStatusFilter, setReporterStatusFilter] = useState<'all' | 'verified' | 'pending' | 'rejected'>('all');
+  const [reporterAppSearch, setReporterAppSearch] = useState('');
+
+  // Editing Reporter Application state
+  const [editingReporter, setEditingReporter] = useState<ReporterApplication | null>(null);
+  const [editRepFullName, setEditRepFullName] = useState('');
+  const [editRepFatherName, setEditRepFatherName] = useState('');
+  const [editRepMotherName, setEditRepMotherName] = useState('');
+  const [editRepMobile, setEditRepMobile] = useState('');
+  const [editRepWhatsapp, setEditRepWhatsapp] = useState('');
+  const [editRepEmail, setEditRepEmail] = useState('');
+  const [editRepState, setEditRepState] = useState('बिहार');
+  const [editRepDistrict, setEditRepDistrict] = useState('दरभंगा');
+  const [editRepBlock, setEditRepBlock] = useState('सदर');
+  const [editRepPanchayat, setEditRepPanchayat] = useState('');
+  const [editRepQualification, setEditRepQualification] = useState('');
+  const [editRepExperience, setEditRepExperience] = useState('');
+  const [editRepBeatPreference, setEditRepBeatPreference] = useState('');
+  const [editRepStatus, setEditRepStatus] = useState<'pending' | 'verified' | 'rejected' | 'card_generated'>('pending');
+  const [editRepAdminNotes, setEditRepAdminNotes] = useState('');
+  const [isSavingReporter, setIsSavingReporter] = useState(false);
 
   // Tab 4 (Manage Articles) state: Reporter Articles vs Admin Articles
   const [manageSubTab, setManageSubTab] = useState<'reporter' | 'admin'>('reporter');
@@ -417,6 +445,155 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
     }
     setTimeout(() => setSuccessMsg(''), 4000);
   };
+
+  // Toggle Verified / Unverified (लंबित / सत्यापित)
+  const handleToggleVerifyReporter = async (app: ReporterApplication) => {
+    const isCurrentlyVerified = app.status === 'verified' || app.status === 'card_generated';
+    const nextStatus = isCurrentlyVerified ? 'pending' : 'verified';
+    try {
+      await updateReporterStatusInFirestore(
+        app.id, 
+        nextStatus, 
+        nextStatus === 'verified' ? 'एडमिन द्वारा सत्यापित किया गया' : 'सत्यापन हटाया गया (लंबित)'
+      );
+      setReporterApps((prev) =>
+        prev.map((r) => (r.id === app.id ? { ...r, status: nextStatus } : r))
+      );
+      setSuccessMsg(
+        nextStatus === 'verified'
+          ? `संवाददाता "${app.fullName}" को आधिकारिक रूप से सत्यापित (Verified) किया गया।`
+          : `संवाददाता "${app.fullName}" को असत्यापित/लंबित (Non-Verified) किया गया।`
+      );
+    } catch (err: any) {
+      setSuccessMsg('त्रुटि: स्थिति बदली नहीं जा सकी।');
+    }
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Delete Reporter Application permanently from Firestore
+  const handleDeleteReporter = async (appId: string, fullName: string) => {
+    if (!confirm(`क्या आप वाकई संवाददाता "${fullName}" (ID: ${appId}) के आवेदन को फायरस्टोर डेटाबेस से हमेशा के लिए हटाना चाहते हैं?`)) {
+      return;
+    }
+    try {
+      await deleteReporterApplicationFromFirestore(appId);
+      setReporterApps((prev) => prev.filter((r) => r.id !== appId));
+      setSuccessMsg(`संवाददाता "${fullName}" का आवेदन सफलतापूर्वक हटा दिया गया।`);
+      if (editingReporter?.id === appId) {
+        setEditingReporter(null);
+      }
+      if (selectedReporterForCard?.id === appId) {
+        setSelectedReporterForCard(null);
+        setIsCardModalOpen(false);
+      }
+    } catch (err: any) {
+      console.error('Delete reporter error:', err);
+      setSuccessMsg('त्रुटि: संवाददाता आवेदन हटाया नहीं जा सका।');
+    }
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Start Editing Reporter Application
+  const handleStartEditReporter = (app: ReporterApplication) => {
+    setEditingReporter(app);
+    setEditRepFullName(app.fullName || '');
+    setEditRepFatherName(app.fatherName || '');
+    setEditRepMotherName(app.motherName || '');
+    setEditRepMobile(app.mobile || '');
+    setEditRepWhatsapp(app.whatsapp || app.mobile || '');
+    setEditRepEmail(app.email || '');
+    setEditRepState(app.state || 'बिहार');
+    setEditRepDistrict(app.district || 'दरभंगा');
+    setEditRepBlock(app.block || 'सदर');
+    setEditRepPanchayat(app.panchayat || app.workArea || '');
+    setEditRepQualification(app.qualification || '');
+    setEditRepExperience(app.experience || '');
+    setEditRepBeatPreference(app.beatPreference || '');
+    setEditRepStatus(app.status || 'pending');
+    setEditRepAdminNotes(app.adminNotes || '');
+  };
+
+  // Save Edited Reporter Application
+  const handleSaveEditedReporter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReporter) return;
+    if (!editRepFullName.trim()) {
+      alert('कृपया संवाददाता का नाम दर्ज करें।');
+      return;
+    }
+    if (!editRepMobile.trim()) {
+      alert('कृपया वैध मोबाइल नंबर दर्ज करें।');
+      return;
+    }
+
+    setIsSavingReporter(true);
+    const updatedFields: Partial<ReporterApplication> = {
+      fullName: editRepFullName.trim(),
+      fatherName: editRepFatherName.trim(),
+      motherName: editRepMotherName.trim() || undefined,
+      mobile: editRepMobile.trim(),
+      whatsapp: editRepWhatsapp.trim() || editRepMobile.trim(),
+      email: editRepEmail.trim(),
+      state: editRepState.trim() || 'बिहार',
+      district: editRepDistrict.trim() || 'दरभंगा',
+      block: editRepBlock.trim() || 'सदर',
+      panchayat: editRepPanchayat.trim(),
+      workArea: editRepPanchayat.trim(),
+      qualification: editRepQualification.trim(),
+      experience: editRepExperience.trim(),
+      beatPreference: editRepBeatPreference.trim(),
+      status: editRepStatus,
+      adminNotes: editRepAdminNotes.trim(),
+    };
+
+    try {
+      await updateReporterApplicationInFirestore(editingReporter.id, updatedFields);
+      setReporterApps((prev) =>
+        prev.map((r) => (r.id === editingReporter.id ? { ...r, ...updatedFields } : r))
+      );
+      setSuccessMsg(`संवाददाता "${editRepFullName}" का विवरण सफलतापूर्वक अपडेट किया गया!`);
+      setEditingReporter(null);
+    } catch (err: any) {
+      console.error('Save edited reporter error:', err);
+      setSuccessMsg('त्रुटि: संवाददाता विवरण सुरक्षित नहीं हो सका।');
+    } finally {
+      setIsSavingReporter(false);
+      setTimeout(() => setSuccessMsg(''), 4500);
+    }
+  };
+
+  // Open PVC Press ID Card / Appointment Letter Modal
+  const handleOpenCardModal = (app: ReporterApplication) => {
+    setSelectedReporterForCard(app);
+    setIsCardModalOpen(true);
+  };
+
+  // Filtered Reporter Applications
+  const filteredReporterApps = useMemo(() => {
+    let list = reporterApps;
+    if (reporterStatusFilter === 'verified') {
+      list = list.filter((r) => r.status === 'verified' || r.status === 'card_generated');
+    } else if (reporterStatusFilter === 'pending') {
+      list = list.filter((r) => r.status === 'pending');
+    } else if (reporterStatusFilter === 'rejected') {
+      list = list.filter((r) => r.status === 'rejected');
+    }
+
+    if (reporterAppSearch.trim()) {
+      const q = reporterAppSearch.toLowerCase().trim();
+      list = list.filter((r) =>
+        (r.fullName || '').toLowerCase().includes(q) ||
+        (r.fatherName || '').toLowerCase().includes(q) ||
+        (r.mobile || '').toLowerCase().includes(q) ||
+        (r.email || '').toLowerCase().includes(q) ||
+        (r.district || '').toLowerCase().includes(q) ||
+        (r.block || '').toLowerCase().includes(q) ||
+        (r.beatPreference || '').toLowerCase().includes(q) ||
+        (r.id || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [reporterApps, reporterStatusFilter, reporterAppSearch]);
 
   const handleDeleteArticle = async (id: string) => {
     if (!confirm('क्या आप वाकई इस समाचार को फायरस्टोर डेटाबेस से हटाना चाहते हैं?')) return;
@@ -1125,132 +1302,339 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
               {/* TAB 3: REPORTER APPLICATIONS DESK */}
               {tab === 'reporters' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-stone-600">
-                      संवाददाता आवेदनों की समीक्षा करें, दस्तावेज जांचें एवं अधिकृत प्रेस मान्यता कार्ड जारी करें।
-                    </p>
+                  {/* Top Header & Refresh */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-stone-200">
+                    <div>
+                      <h4 className="font-bold text-sm text-stone-900 flex items-center gap-2">
+                        <span>संवाददाता आवेदन प्रबंधन एवं मान्यता डेस्क</span>
+                        <span className="text-[10px] font-mono bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">
+                          कुल: {reporterApps.length}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-stone-600">
+                        संवाददाता के आवेदन को संपादित (Edit) करें, स्थायी डिलीट करें, सत्यापित/असत्यापित मार्क करें और PVC प्रेस कार्ड व नियुक्ति पत्र जारी करें।
+                      </p>
+                    </div>
                     <button
+                      type="button"
                       onClick={loadReporters}
-                      className="text-xs text-red-700 hover:underline font-semibold"
+                      className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-lg border border-stone-300 transition flex items-center gap-1.5 cursor-pointer shrink-0"
                     >
-                      सूची ताज़ा करें (Refresh)
+                      <RefreshCw className="w-3.5 h-3.5 text-stone-600" />
+                      <span>सूची ताज़ा करें (Refresh)</span>
                     </button>
                   </div>
 
+                  {/* Filter Tabs & Search Bar */}
+                  <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-2.5">
+                    {/* Status Filter Tabs */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="inline-flex p-1 bg-white rounded-lg border border-stone-200 text-xs shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setReporterStatusFilter('all')}
+                          className={`px-3 py-1 rounded font-bold transition cursor-pointer ${
+                            reporterStatusFilter === 'all'
+                              ? 'bg-stone-900 text-white shadow-2xs'
+                              : 'text-stone-600 hover:text-stone-900'
+                          }`}
+                        >
+                          सभी ({reporterApps.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReporterStatusFilter('verified')}
+                          className={`px-3 py-1 rounded font-bold transition flex items-center gap-1 cursor-pointer ${
+                            reporterStatusFilter === 'verified'
+                              ? 'bg-emerald-700 text-white shadow-2xs'
+                              : 'text-emerald-800 hover:bg-emerald-50'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>सत्यापित ({reporterApps.filter((r) => r.status === 'verified' || r.status === 'card_generated').length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReporterStatusFilter('pending')}
+                          className={`px-3 py-1 rounded font-bold transition flex items-center gap-1 cursor-pointer ${
+                            reporterStatusFilter === 'pending'
+                              ? 'bg-amber-600 text-white shadow-2xs'
+                              : 'text-amber-800 hover:bg-amber-50'
+                          }`}
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          <span>लंबित / असत्यापित ({reporterApps.filter((r) => r.status === 'pending').length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReporterStatusFilter('rejected')}
+                          className={`px-3 py-1 rounded font-bold transition flex items-center gap-1 cursor-pointer ${
+                            reporterStatusFilter === 'rejected'
+                              ? 'bg-red-700 text-white shadow-2xs'
+                              : 'text-red-700 hover:bg-red-50'
+                          }`}
+                        >
+                          <UserX className="w-3 h-3" />
+                          <span>अस्वीकृत ({reporterApps.filter((r) => r.status === 'rejected').length})</span>
+                        </button>
+                      </div>
+
+                      <div className="text-[11px] text-stone-500 font-medium">
+                        दिखाए जा रहे आवेदन: <strong>{filteredReporterApps.length}</strong>
+                      </div>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={reporterAppSearch}
+                        onChange={(e) => setReporterAppSearch(e.target.value)}
+                        placeholder="नाम, पिता का नाम, मोबाइल नंबर, ईमेल, जिला, प्रखंड या आईडी से खोजें..."
+                        className="w-full pl-9 pr-8 py-2 text-xs border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900 placeholder-stone-400"
+                      />
+                      {reporterAppSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setReporterAppSearch('')}
+                          className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* List of Applications */}
                   {isLoadingReporters ? (
-                    <div className="text-center py-8 text-stone-500 text-xs">आवेदन लोड हो रहे हैं...</div>
-                  ) : reporterApps.length === 0 ? (
-                    <div className="text-center py-8 text-stone-400 text-xs border border-dashed rounded-lg">
-                      वर्तमान में कोई नया संवाददाता आवेदन उपलब्ध नहीं है।
+                    <div className="text-center py-12 text-stone-500 text-xs flex flex-col items-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-red-700" />
+                      <span>फायरस्टोर से संवाददाता आवेदन लोड हो रहे हैं...</span>
+                    </div>
+                  ) : filteredReporterApps.length === 0 ? (
+                    <div className="text-center py-10 text-stone-400 text-xs border border-dashed rounded-xl bg-stone-50 p-6 space-y-1">
+                      <Users className="w-8 h-8 text-stone-300 mx-auto" />
+                      <p className="font-bold text-stone-600">कोई संवाददाता आवेदन नहीं मिला।</p>
+                      <p className="text-[11px]">कृपया चुने गए फ़िल्टर बदलें या खोज शब्द साफ करें।</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {reporterApps.map((app) => (
-                        <div key={app.id} className="p-4 border border-stone-200 rounded-lg bg-stone-50/60 hover:bg-white transition space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200/80 pb-2">
-                            <div>
-                              <span className="font-mono text-xs font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded">
-                                {app.id}
-                              </span>
-                              <h4 className="font-bold text-stone-900 text-sm mt-1">{app.fullName}</h4>
-                              <p className="text-[11px] text-stone-600">
-                                पिता: <strong>{app.fatherName || '—'}</strong> | माता: <strong>{app.motherName || '—'}</strong> | मोबाइल: <span className="font-mono">{app.mobile}</span> | व्हाट्सएप: <span className="font-mono font-semibold text-emerald-800">{app.whatsapp || app.mobile}</span>
-                              </p>
-                              <p className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
-                                <span>ईमेल: {app.email || '—'}</span>
-                                <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                  ✓ ईमेल सत्यापित (Email Verified)
-                                </span>
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
-                                app.status === 'card_generated' || app.status === 'verified'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : app.status === 'rejected'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {app.status === 'card_generated' || app.status === 'verified' 
-                                  ? 'सत्यापित (Approved)' 
-                                  : app.status === 'rejected'
-                                  ? 'अस्वीकृत (Rejected)'
-                                  : 'लंबित (Pending)'}
-                              </span>
-                            </div>
-                          </div>
+                    <div className="space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
+                      {filteredReporterApps.map((app) => {
+                        const isVerified = app.status === 'verified' || app.status === 'card_generated';
+                        const isRejected = app.status === 'rejected';
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-stone-600 bg-white p-2.5 rounded-lg border border-stone-200">
-                            <div>
-                              <span className="text-stone-400 block text-[10px]">राज्य / जिला:</span>
-                              <strong className="text-stone-800">{app.state || 'बिहार'} / {app.district}</strong>
-                            </div>
-                            <div>
-                              <span className="text-stone-400 block text-[10px]">प्रखंड / कार्यक्षेत्र:</span>
-                              <strong className="text-stone-800">{app.block} / {app.panchayat || app.workArea || '—'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-stone-400 block text-[10px]">योग्यता व अनुभव:</span>
-                              <span>{app.qualification || '—'} ({app.experience || '—'})</span>
-                            </div>
-                            <div>
-                              <span className="text-stone-400 block text-[10px]">रुचि का क्षेत्र (Beat):</span>
-                              <span className="font-medium text-red-800">{app.beatPreference}</span>
-                            </div>
-                          </div>
+                        return (
+                          <div
+                            key={app.id}
+                            className={`p-4 border rounded-xl bg-white transition shadow-2xs space-y-3 ${
+                              isVerified 
+                                ? 'border-emerald-300 ring-1 ring-emerald-100' 
+                                : isRejected 
+                                ? 'border-red-200 bg-red-50/20' 
+                                : 'border-stone-200'
+                            }`}
+                          >
+                            {/* Card Header Row */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-stone-100 pb-2.5">
+                              <div className="flex items-start gap-3">
+                                {/* Photo or Avatar */}
+                                <div className="relative w-12 h-14 rounded-lg overflow-hidden border border-stone-300 bg-stone-100 shrink-0">
+                                  {app.photoUrl ? (
+                                    <img src={app.photoUrl} alt={app.fullName} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <img src="/images/ddn_reporter_press.jpg" alt="Default" className="w-full h-full object-cover" />
+                                  )}
+                                  {isVerified && (
+                                    <div className="absolute top-0.5 right-0.5 bg-emerald-600 text-white p-0.5 rounded-full">
+                                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                    </div>
+                                  )}
+                                </div>
 
-                          {/* Action Buttons */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-100">
-                            <div className="flex items-center gap-2">
-                              {app.photoUrl && (
-                                <button 
-                                  type="button"
-                                  onClick={() => setPreviewMedia({
-                                    url: app.photoUrl!,
-                                    title: `${app.fullName} - पासपोर्ट फोटो`,
-                                    type: 'photo'
-                                  })}
-                                  className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded border border-blue-200 flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-blue-600" /> फोटो देखें
-                                </button>
-                              )}
-                              {app.idDocumentUrl && (
-                                <button 
-                                  type="button"
-                                  onClick={() => setPreviewMedia({
-                                    url: app.idDocumentUrl!,
-                                    title: `${app.fullName} - पहचान पत्र (ID Proof)`,
-                                    type: 'id'
-                                  })}
-                                  className="text-[11px] text-purple-700 hover:text-purple-900 font-semibold bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded border border-purple-200 flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-purple-600" /> पहचान पत्र देखें
-                                </button>
-                              )}
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono text-[10px] font-bold text-red-800 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                                      {app.id}
+                                    </span>
+                                    <h4 className="font-bold text-stone-900 text-sm font-serif">
+                                      {app.fullName}
+                                    </h4>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      isVerified
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                        : isRejected
+                                        ? 'bg-red-100 text-red-800 border-red-300'
+                                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                                    }`}>
+                                      {isVerified ? '✓ सत्यापित (Verified)' : isRejected ? '✕ अस्वीकृत (Rejected)' : '⏳ लंबित (Non-Verified)'}
+                                    </span>
+                                  </div>
+
+                                  <p className="text-[11px] text-stone-600 mt-0.5">
+                                    पिता: <strong>{app.fatherName || '—'}</strong> | माता: <strong>{app.motherName || '—'}</strong> | मोबाइल: <span className="font-mono font-semibold text-stone-900">{app.mobile}</span> | व्हाट्सएप: <span className="font-mono font-semibold text-emerald-800">{app.whatsapp || app.mobile}</span>
+                                  </p>
+                                  <p className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
+                                    <span>ईमेल: {app.email || '—'}</span>
+                                    <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                      ✓ ईमेल सत्यापित
+                                    </span>
+                                    <span className="text-stone-400 font-mono text-[10px]">· आवेदन तिथि: {app.appliedDate}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Media Viewers (Photo & ID Document) */}
+                              <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
+                                {app.photoUrl && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => setPreviewMedia({
+                                      url: app.photoUrl!,
+                                      title: `${app.fullName} - पासपोर्ट फोटो`,
+                                      type: 'photo'
+                                    })}
+                                    className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>फोटो देखें</span>
+                                  </button>
+                                )}
+                                {app.idDocumentUrl && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => setPreviewMedia({
+                                      url: app.idDocumentUrl!,
+                                      title: `${app.fullName} - पहचान पत्र (ID Proof)`,
+                                      type: 'id'
+                                    })}
+                                    className="text-[11px] text-purple-700 hover:text-purple-900 font-semibold bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-200 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-purple-600" />
+                                    <span>पहचान पत्र देखें</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              {app.status !== 'card_generated' && (
+                            {/* Middle Details Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-stone-600 bg-stone-50/80 p-2.5 rounded-lg border border-stone-200">
+                              <div>
+                                <span className="text-stone-400 block text-[10px]">राज्य / जिला:</span>
+                                <strong className="text-stone-800">{app.state || 'बिहार'} / {app.district}</strong>
+                              </div>
+                              <div>
+                                <span className="text-stone-400 block text-[10px]">प्रखंड / पंचायत:</span>
+                                <strong className="text-stone-800">{app.block} / {app.panchayat || app.workArea || '—'}</strong>
+                              </div>
+                              <div>
+                                <span className="text-stone-400 block text-[10px]">शैक्षणिक योग्यता व अनुभव:</span>
+                                <span>{app.qualification || '—'} ({app.experience || '—'})</span>
+                              </div>
+                              <div>
+                                <span className="text-stone-400 block text-[10px]">रुचि का क्षेत्र (Beat):</span>
+                                <span className="font-bold text-red-800">{app.beatPreference || 'सामान्य समाचार'}</span>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons Row: Edit, Verify Toggle, ID Card / Letterhead, Approve, Reject, Delete */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-100">
+                              {/* Left: Documents / PVC ID Card & Letterhead Column */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
-                                  onClick={() => handleApproveReporter(app.id)}
-                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded shadow-xs"
+                                  type="button"
+                                  onClick={() => handleOpenCardModal(app)}
+                                  className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+                                  title="PVC मानक CR80 प्रेस कार्ड तैयार करें व प्रिंट/डाउनलोड करें"
                                 >
-                                  स्वीकृत करें व प्रेस कार्ड जारी करें
+                                  <Award className="w-3.5 h-3.5 text-yellow-300" />
+                                  <span>🪪 PVC प्रेस आईडी कार्ड</span>
                                 </button>
-                              )}
-                              {app.status !== 'rejected' && (
+
                                 <button
-                                  onClick={() => handleRejectReporter(app.id)}
-                                  className="px-3 py-1 bg-stone-200 hover:bg-red-100 text-stone-700 hover:text-red-700 text-xs font-semibold rounded"
+                                  type="button"
+                                  onClick={() => handleOpenCardModal(app)}
+                                  className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+                                  title="अधिकृत नियुक्ति पत्र (लेटरहेड) देखें व प्रिंट/डाउनलोड करें"
                                 >
-                                  अस्वीकार करें
+                                  <FileText className="w-3.5 h-3.5 text-stone-300" />
+                                  <span>📜 नियुक्ति पत्र (Letterhead)</span>
                                 </button>
-                              )}
+                              </div>
+
+                              {/* Right: Administrative Actions (Edit, Verify Toggle, Approve, Reject, Delete) */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* Edit Application Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditReporter(app)}
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="आवेदन के सभी विवरण सुधारें (Edit Application Details)"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-amber-700" />
+                                  <span>सुधारें (Edit)</span>
+                                </button>
+
+                                {/* Toggle Verified / Unverified */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleVerifyReporter(app)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1 cursor-pointer shadow-2xs ${
+                                    isVerified
+                                      ? 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-300'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  }`}
+                                  title={isVerified ? 'सत्यापन हटाएं (मार्क असत्यापित)' : 'आधिकारिक रूप से सत्यापित मार्क करें'}
+                                >
+                                  {isVerified ? (
+                                    <>
+                                      <UserX className="w-3.5 h-3.5 text-stone-500" />
+                                      <span>असत्यापित करें</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>सत्यापित करें</span>
+                                    </>
+                                  )}
+                                </button>
+
+                                {/* Approve with Card Status */}
+                                {app.status !== 'card_generated' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveReporter(app.id)}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs transition cursor-pointer"
+                                  >
+                                    स्वीकृत करें
+                                  </button>
+                                )}
+
+                                {/* Reject Button */}
+                                {app.status !== 'rejected' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRejectReporter(app.id)}
+                                    className="px-2.5 py-1.5 bg-stone-100 hover:bg-red-50 text-stone-600 hover:text-red-700 border border-stone-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                  >
+                                    अस्वीकार
+                                  </button>
+                                )}
+
+                                {/* Delete Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteReporter(app.id, app.fullName)}
+                                  className="p-1.5 bg-stone-100 hover:bg-red-100 text-stone-500 hover:text-red-700 border border-stone-300 rounded-lg transition cursor-pointer"
+                                  title="आवेदन स्थायी रूप से हटाएं (Delete from Database)"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1874,6 +2258,270 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* FULL REPORTER APPLICATION EDIT MODAL (ADMIN RIGHT TO REVISE ANY FIELD) */}
+      {editingReporter && (
+        <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-stone-300 overflow-hidden my-auto flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-stone-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-stone-800">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h4 className="font-bold text-sm sm:text-base font-serif">
+                    संवाददाता आवेदन संशोधन (Admin Application Editor)
+                  </h4>
+                  <p className="text-[11px] text-stone-300">
+                    आईडी: <span className="font-mono text-amber-300">{editingReporter.id}</span> | आवेदक: <strong>{editingReporter.fullName}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingReporter(null)}
+                className="p-1 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSaveEditedReporter} className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    संवाददाता का पूरा नाम *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editRepFullName}
+                    onChange={(e) => setEditRepFullName(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    पिता का नाम *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editRepFatherName}
+                    onChange={(e) => setEditRepFatherName(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    माता का नाम
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepMotherName}
+                    onChange={(e) => setEditRepMotherName(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    मोबाइल नंबर *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={editRepMobile}
+                    onChange={(e) => setEditRepMobile(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    व्हाट्सएप नंबर
+                  </label>
+                  <input
+                    type="tel"
+                    value={editRepWhatsapp}
+                    onChange={(e) => setEditRepWhatsapp(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    ईमेल आईडी
+                  </label>
+                  <input
+                    type="email"
+                    value={editRepEmail}
+                    onChange={(e) => setEditRepEmail(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg focus:border-red-700 focus:outline-none bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Geographic Hierarchy */}
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-3">
+                <span className="font-bold text-stone-800 block text-[11px]">
+                  कार्यक्षेत्र एवं भौगोलिक पता (Reporting Area & Geography)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-600 mb-1">राज्य</label>
+                    <input
+                      type="text"
+                      value={editRepState}
+                      onChange={(e) => setEditRepState(e.target.value)}
+                      className="w-full p-1.5 border border-stone-300 rounded bg-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-600 mb-1">ज़िला</label>
+                    <input
+                      type="text"
+                      value={editRepDistrict}
+                      onChange={(e) => setEditRepDistrict(e.target.value)}
+                      className="w-full p-1.5 border border-stone-300 rounded bg-white text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-600 mb-1">प्रखंड / तहसील</label>
+                    <input
+                      type="text"
+                      value={editRepBlock}
+                      onChange={(e) => setEditRepBlock(e.target.value)}
+                      className="w-full p-1.5 border border-stone-300 rounded bg-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-600 mb-1">
+                    पंचायत / वार्ड / विशिष्ट कार्यक्षेत्र
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepPanchayat}
+                    onChange={(e) => setEditRepPanchayat(e.target.value)}
+                    placeholder="उदा. बेनीपुर नगर परिषद, कुशेश्वरस्थान पूर्वी..."
+                    className="w-full p-1.5 border border-stone-300 rounded bg-white text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Journalism / Qualification */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    शैक्षणिक योग्यता
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepQualification}
+                    onChange={(e) => setEditRepQualification(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    पत्रकारिता अनुभव
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepExperience}
+                    onChange={(e) => setEditRepExperience(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    रुचि का क्षेत्र (Beat)
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepBeatPreference}
+                    onChange={(e) => setEditRepBeatPreference(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-lg bg-white text-red-800 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Status and Notes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    मान्यता एवं सत्यापन स्थिति (Application Status)
+                  </label>
+                  <select
+                    value={editRepStatus}
+                    onChange={(e) => setEditRepStatus(e.target.value as any)}
+                    className="w-full p-2 border border-stone-300 rounded-lg bg-white font-bold"
+                  >
+                    <option value="pending">⏳ लंबित / असत्यापित (Pending)</option>
+                    <option value="verified">✓ सत्यापित (Verified)</option>
+                    <option value="card_generated">🪪 स्वीकृत एवं प्रेस कार्ड जारी (Card Generated)</option>
+                    <option value="rejected">✕ अस्वीकृत (Rejected)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    संपादक रिमार्क / निर्देश (Admin Notes)
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepAdminNotes}
+                    onChange={(e) => setEditRepAdminNotes(e.target.value)}
+                    placeholder="उदा. दस्तावेज सत्यापित, मुख्य संपादक द्वारा अधिकृत..."
+                    className="w-full p-2 border border-stone-300 rounded-lg bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingReporter(null)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-lg border border-stone-300 transition cursor-pointer"
+                >
+                  रद्द करें
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingReporter}
+                  className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingReporter ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>फायरस्टोर में सुरक्षित हो रहा है...</span>
+                    </>
+                  ) : (
+                    <span>सुरक्षित करें (Save Changes)</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PVC Press ID Card & Appointment Letter Modal */}
+      <ReporterIdCardModal
+        reporter={selectedReporterForCard}
+        isOpen={isCardModalOpen}
+        onClose={() => {
+          setIsCardModalOpen(false);
+          setSelectedReporterForCard(null);
+        }}
+      />
     </div>
   );
 };

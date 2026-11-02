@@ -53,10 +53,17 @@ export default function Error({ error, reset }: ErrorProps) {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
             <button
-              onClick={() => reset()}
-              className="w-full sm:w-1/2 py-2.5 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm cursor-pointer active:scale-95"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.removeItem('ddn_custom_articles');
+                  } catch (e) {}
+                }
+                reset();
+              }}
+              className="w-full sm:w-1/2 py-2.5 px-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition flex items-center justify-center gap-1.5 text-xs sm:text-sm shadow-sm cursor-pointer active:scale-95"
             >
               <RefreshCw className="w-4 h-4" />
               <span>पुनः प्रयास करें (Retry)</span>
@@ -64,10 +71,17 @@ export default function Error({ error, reset }: ErrorProps) {
 
             <a
               href="/"
-              className="w-full sm:w-1/2 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg transition border border-stone-300 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer active:scale-95"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.removeItem('ddn_custom_articles');
+                  } catch (e) {}
+                }
+              }}
+              className="w-full sm:w-1/2 py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg transition border border-stone-300 flex items-center justify-center gap-1.5 text-xs sm:text-sm cursor-pointer active:scale-95"
             >
               <Home className="w-4 h-4" />
-              <span>होमपेज पर जाएं</span>
+              <span>होमपेज लोड करें</span>
             </a>
           </div>
 

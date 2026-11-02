@@ -12,7 +12,7 @@ export const HealthEducationSection: React.FC<HealthEducationSectionProps> = ({
   onSelectArticle,
 }) => {
   const healthArticles = articles.filter(
-    (a) => a.category === 'education-health' || a.tags.some((t) => t.includes('स्वास्थ्य') || t.includes('शिक्षा'))
+    (a) => a.category === 'education-health' || (a.tags || []).some((t) => t && (t.includes('स्वास्थ्य') || t.includes('शिक्षा')))
   );
 
   return (

@@ -175,7 +175,8 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
       window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
     } else {
-      const fullText = `${article.title}। ${article.subtitle || article.summary}। ${article.content.join(' ')}`;
+      const contentStr = Array.isArray(article.content) ? article.content.join(' ') : String(article.content || '');
+      const fullText = `${article.title || ''}। ${article.subtitle || article.summary || ''}। ${contentStr}`;
       const utterance = new SpeechSynthesisUtterance(fullText);
       utterance.lang = 'hi-IN';
       utterance.rate = 0.95;
@@ -216,9 +217,9 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
     'headline': article.title,
     'description': article.summary,
     'image': [
-      article.imageUrl.startsWith('http')
-        ? article.imageUrl
-        : `${SITE_CONFIG.productionDomain}${article.imageUrl}`,
+      (article.imageUrl || '/images/ddn_hero_news.jpg').startsWith('http')
+        ? (article.imageUrl || '/images/ddn_hero_news.jpg')
+        : `${SITE_CONFIG.productionDomain}${article.imageUrl || '/images/ddn_hero_news.jpg'}`,
     ],
     'datePublished': article.datePublished,
     'dateModified': article.dateModified || article.datePublished,
@@ -362,7 +363,7 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
               <span aria-hidden="true" className="text-stone-300">·</span>
               <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-stone-500">
                 <Eye className="w-3.5 h-3.5 text-stone-400" />
-                {article.views.toLocaleString('hi-IN')} पाठक
+                {(article.views ?? 100).toLocaleString('hi-IN')} पाठक
               </span>
             </div>
 
@@ -538,7 +539,7 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
                   : 'text-xl'
               }`}
             >
-              {article.content.map((paragraph, index) => (
+              {(Array.isArray(article.content) ? article.content : [article.summary || article.title || '']).map((paragraph, index) => (
                 <p key={index} className="text-justify first-letter:text-3xl first-letter:font-serif first-letter:font-bold first-letter:text-red-700 first-letter:mr-1">
                   {paragraph}
                 </p>
@@ -622,7 +623,7 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
 
               {/* Tags */}
               <div className="flex flex-wrap gap-1 text-xs text-stone-500">
-                {article.tags.map((tag) => (
+                {(article.tags || []).map((tag) => (
                   <span key={tag} className="text-stone-600 bg-stone-100 px-2 py-0.5 rounded text-[11px]">
                     #{tag}
                   </span>
@@ -712,7 +713,7 @@ export const ArticleExpressDetail: React.FC<ArticleExpressDetailProps> = ({
                           {trend.title}
                         </h4>
                         <div className="flex items-center gap-2 text-[10px] text-stone-400 font-mono">
-                          <span>{trend.views.toLocaleString('hi-IN')} व्यूज</span>
+                          <span>{(trend.views ?? 100).toLocaleString('hi-IN')} व्यूज</span>
                         </div>
                       </div>
 

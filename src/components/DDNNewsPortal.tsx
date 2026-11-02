@@ -100,13 +100,23 @@ export default function App({
       try {
         const stored = localStorage.getItem('ddn_custom_articles');
         if (stored) {
-          const parsed = JSON.parse(stored) as Article[];
+          const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setArticles((prev) => mergeArticles(prev, parsed));
+            const cleanItems = parsed
+              .filter((item: any) => item && item.id && !String(item.id).startsWith('art-test-') && item.title)
+              .map((item: any) => mergeArticles([], [item])[0])
+              .filter(Boolean);
+            if (cleanItems.length > 0) {
+              setArticles((prev) => mergeArticles(prev, cleanItems));
+              localStorage.setItem('ddn_custom_articles', JSON.stringify(cleanItems));
+            } else {
+              localStorage.removeItem('ddn_custom_articles');
+            }
           }
         }
       } catch (e) {
         console.warn('LocalStorage restore error:', e);
+        try { localStorage.removeItem('ddn_custom_articles'); } catch {}
       }
     }
 
@@ -396,10 +406,10 @@ export default function App({
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (a) =>
-          a.title.toLowerCase().includes(q) ||
-          a.summary.toLowerCase().includes(q) ||
-          a.location.toLowerCase().includes(q) ||
-          a.tags.some((t) => t.toLowerCase().includes(q))
+          (a.title || '').toLowerCase().includes(q) ||
+          (a.summary || '').toLowerCase().includes(q) ||
+          (a.location || '').toLowerCase().includes(q) ||
+          (a.tags || []).some((t) => t && t.toLowerCase().includes(q))
       );
     }
 
@@ -407,7 +417,7 @@ export default function App({
   }, [publishedArticles, activeCategory, searchQuery]);
 
   const leadArticle = useMemo(() => {
-    return filteredArticles.find((a) => a.isLead) || filteredArticles[0] || publishedArticles[0];
+    return filteredArticles.find((a) => a.isLead) || filteredArticles[0] || publishedArticles[0] || INITIAL_ARTICLES[0];
   }, [filteredArticles, publishedArticles]);
 
   const regularArticles = useMemo(() => {

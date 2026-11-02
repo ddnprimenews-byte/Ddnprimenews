@@ -50,16 +50,16 @@ export const HeroLead: React.FC<HeroLeadProps> = ({
             {/* Zero-Pill Clean Metadata */}
             <div className="flex items-center flex-wrap gap-2 text-xs font-medium text-stone-500 mb-2.5">
               <span className="text-red-700 font-bold uppercase tracking-wider">
-                {leadArticle.categoryHindi}
+                {leadArticle.categoryHindi || 'बिहार विशेष'}
               </span>
               <span aria-hidden="true" className="text-stone-300">·</span>
-              <span>{leadArticle.location}</span>
+              <span>{leadArticle.location || 'दरभंगा'}</span>
               <span aria-hidden="true" className="text-stone-300">·</span>
-              <span>{leadArticle.publishedAt}</span>
+              <span>{leadArticle.publishedAt || 'हालिया समाचार'}</span>
               <span aria-hidden="true" className="text-stone-300">·</span>
               <span className="flex items-center gap-1">
                 <Eye className="w-3 h-3 text-stone-400" />
-                <span className="tabular-nums font-mono">{leadArticle.views.toLocaleString('hi-IN')}</span>
+                <span className="tabular-nums font-mono">{(leadArticle.views ?? 120).toLocaleString('hi-IN')}</span>
               </span>
             </div>
 

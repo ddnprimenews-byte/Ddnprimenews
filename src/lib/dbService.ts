@@ -31,15 +31,108 @@ export interface ContactMessage {
 }
 
 /**
+ * Universal Sanitizer for News Articles
+ * Guarantees every field exists with valid types to prevent any undefined runtime crashes.
+ */
+export function sanitizeArticle(raw: any): Article {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: `art-fallback-${Date.now()}`,
+      title: 'डीडीएन प्राइम न्यूज़ बुलेटिन',
+      subtitle: '',
+      summary: 'ताज़ा समाचार विवरण लोड हो रहा है...',
+      content: ['ताज़ा समाचार विवरण लोड हो रहा है...'],
+      category: 'bihar',
+      categoryHindi: 'बिहार विशेष',
+      location: 'दरभंगा',
+      publishedAt: 'हालिया समाचार',
+      datePublished: new Date().toISOString(),
+      dateModified: new Date().toISOString(),
+      author: 'डीडीएन विशेष संवाददाता',
+      authorRole: 'ब्यूरो चीफ',
+      authorAvatar: '/images/ddn_reporter_press.jpg',
+      imageUrl: '/images/ddn_hero_news.jpg',
+      imageCaption: 'डीडीएन प्राइम डिजिटल कवरेज',
+      readTime: '3 मिनट',
+      views: 120,
+      tags: ['दरभंगा', 'बिहार', 'डीडीएन प्राइम न्यूज'],
+      isLead: false,
+      isBreaking: false,
+      status: 'published',
+      slug: `news-${Date.now()}`,
+    };
+  }
+
+  const rawTags = Array.isArray(raw.tags) ? raw.tags : [];
+  const rawContent = Array.isArray(raw.content)
+    ? raw.content
+    : typeof raw.content === 'string' && raw.content.trim()
+    ? raw.content.split('\n\n').filter((p: string) => p.trim())
+    : [raw.summary || raw.title || 'डीडीएन प्राइम विशेष रिपोर्ट'];
+
+  const category = (raw.category as NewsCategory) || 'bihar';
+  const categoryHindiMap: Record<string, string> = {
+    bihar: 'बिहार विशेष',
+    national: 'देश / राष्ट्रीय',
+    politics: 'राजनीति',
+    crime: 'अपराध डायरी',
+    'education-health': 'शिक्षा & स्वास्थ्य',
+    sports: 'खेल जगत',
+    entertainment: 'मनोरंजन',
+  };
+
+  const id = String(raw.id || `art-${Date.now()}`);
+  const title = String(raw.title || 'डीडीएन प्राइम न्यूज़');
+  const summary = String(raw.summary || (rawContent[0] ? rawContent[0].slice(0, 160) : title));
+
+  return {
+    id,
+    title,
+    subtitle: typeof raw.subtitle === 'string' ? raw.subtitle : '',
+    summary,
+    content: rawContent.length > 0 ? rawContent : [summary],
+    category,
+    categoryHindi: raw.categoryHindi || categoryHindiMap[category] || 'बिहार विशेष',
+    location: typeof raw.location === 'string' && raw.location.trim() ? raw.location : 'दरभंगा',
+    publishedAt: typeof raw.publishedAt === 'string' && raw.publishedAt.trim() ? raw.publishedAt : 'हालिया समाचार',
+    datePublished: typeof raw.datePublished === 'string' ? raw.datePublished : new Date().toISOString(),
+    dateModified: typeof raw.dateModified === 'string' ? raw.dateModified : new Date().toISOString(),
+    author: typeof raw.author === 'string' && raw.author.trim() ? raw.author : 'डीडीएन विशेष संवाददाता',
+    authorRole: typeof raw.authorRole === 'string' && raw.authorRole.trim() ? raw.authorRole : 'संवाददाता',
+    authorAvatar: typeof raw.authorAvatar === 'string' && raw.authorAvatar.trim() ? raw.authorAvatar : '/images/ddn_reporter_press.jpg',
+    imageUrl: typeof raw.imageUrl === 'string' && raw.imageUrl.trim() ? raw.imageUrl : '/images/ddn_hero_news.jpg',
+    imageCaption: typeof raw.imageCaption === 'string' ? raw.imageCaption : undefined,
+    readTime: typeof raw.readTime === 'string' && raw.readTime.trim() ? raw.readTime : '3 मिनट',
+    views: typeof raw.views === 'number' && !isNaN(raw.views) ? raw.views : 150,
+    tags: rawTags.length > 0 ? rawTags : ['डीडीएन प्राइम न्यूज', raw.location || 'बिहार'],
+    isLead: Boolean(raw.isLead),
+    isBreaking: Boolean(raw.isBreaking),
+    status: raw.status === 'draft' ? 'draft' : 'published',
+    slug: typeof raw.slug === 'string' && raw.slug.trim() ? raw.slug : `news-${id.replace(/[^a-zA-Z0-9-]/g, '')}`,
+    sections: Array.isArray(raw.sections) ? raw.sections : undefined,
+    youtubeId: typeof raw.youtubeId === 'string' ? raw.youtubeId : undefined,
+    videoUrl: typeof raw.videoUrl === 'string' ? raw.videoUrl : undefined,
+  };
+}
+
+/**
  * Deep merge articles avoiding duplicate IDs and preserving non-mutating immutability
  */
 export function mergeArticles(baseList: Article[], newList: Article[]): Article[] {
   const map = new Map<string, Article>();
   for (const item of baseList) {
-    if (item && item.id) map.set(item.id, { ...item });
+    if (item && item.id) {
+      if (String(item.id).startsWith('art-test-') || !item.title) continue;
+      const sanitized = sanitizeArticle(item);
+      map.set(sanitized.id, sanitized);
+    }
   }
   for (const item of newList) {
-    if (item && item.id) map.set(item.id, { ...item });
+    if (item && item.id) {
+      if (String(item.id).startsWith('art-test-') || !item.title) continue;
+      const sanitized = sanitizeArticle(item);
+      map.set(sanitized.id, sanitized);
+    }
   }
   return Array.from(map.values()).sort((a, b) => {
     if (a.isLead && !b.isLead) return -1;
@@ -76,7 +169,7 @@ export const NewsService = {
 
         const snapshot = await getDocs(q);
         snapshot.forEach((d) => {
-          fetchedArticles.push({ id: d.id, ...(d.data() as any) });
+          fetchedArticles.push(sanitizeArticle({ id: d.id, ...(d.data() as any) }));
         });
       }
     } catch (err) {
@@ -97,10 +190,10 @@ export const NewsService = {
       const q = search.toLowerCase().trim();
       result = result.filter(
         (a) =>
-          a.title.toLowerCase().includes(q) ||
-          a.summary.toLowerCase().includes(q) ||
-          a.location.toLowerCase().includes(q) ||
-          a.tags.some((t) => t.toLowerCase().includes(q))
+          (a.title || '').toLowerCase().includes(q) ||
+          (a.summary || '').toLowerCase().includes(q) ||
+          (a.location || '').toLowerCase().includes(q) ||
+          (a.tags || []).some((t) => t && t.toLowerCase().includes(q))
       );
     }
 

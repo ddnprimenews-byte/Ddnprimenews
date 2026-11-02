@@ -114,7 +114,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({ article, onSelect, onListen 
 
           <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-stone-400 pl-1 border-l border-stone-200">
             <Eye className="w-3 h-3" />
-            {article.views.toLocaleString('hi-IN')}
+            {(article.views ?? 100).toLocaleString('hi-IN')}
           </span>
         </div>
       </div>

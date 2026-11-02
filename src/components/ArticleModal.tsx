@@ -70,7 +70,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
       window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
     } else {
-      const fullText = `${article.title}। ${article.summary}। ${article.content.join(' ')}`;
+      const contentStr = Array.isArray(article.content) ? article.content.join(' ') : String(article.content || '');
+      const fullText = `${article.title || ''}। ${article.summary || ''}। ${contentStr}`;
       const utterance = new SpeechSynthesisUtterance(fullText);
       utterance.lang = 'hi-IN';
       utterance.rate = 0.95;
@@ -206,7 +207,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             <span aria-hidden="true" className="text-stone-300">·</span>
             <span className="flex items-center gap-1 font-mono tabular-nums">
               <Eye className="w-3 h-3" />
-              {article.views.toLocaleString('hi-IN')}
+              {(article.views ?? 100).toLocaleString('hi-IN')}
             </span>
           </div>
 
@@ -261,7 +262,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                 : 'text-xl'
             }`}
           >
-            {article.content.map((p, i) => (
+            {(Array.isArray(article.content) ? article.content : [article.summary || article.title || '']).map((p, i) => (
               <p key={i} className="text-justify first-letter:text-3xl first-letter:font-bold first-letter:text-red-700">
                 {p}
               </p>

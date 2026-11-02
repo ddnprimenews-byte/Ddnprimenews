@@ -90,14 +90,39 @@ export function subscribeToArticles(
     (snapshot) => {
       const items: Article[] = [];
       snapshot.forEach((docSnap) => {
-        items.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        const raw = docSnap.data();
+        if (docSnap.id.startsWith('art-test-') || !raw.title) return;
+        items.push({
+          id: docSnap.id,
+          title: raw.title || 'डीडीएन समाचार',
+          subtitle: raw.subtitle || '',
+          summary: raw.summary || raw.title || '',
+          content: Array.isArray(raw.content) ? raw.content : [raw.summary || raw.title || ''],
+          category: raw.category || 'bihar',
+          categoryHindi: raw.categoryHindi || 'बिहार विशेष',
+          location: raw.location || 'दरभंगा',
+          publishedAt: raw.publishedAt || 'हालिया',
+          datePublished: raw.datePublished || new Date().toISOString(),
+          dateModified: raw.dateModified,
+          author: raw.author || 'संवाददाता',
+          authorRole: raw.authorRole || 'ब्यूरो चीफ',
+          authorAvatar: raw.authorAvatar || '/images/ddn_reporter_press.jpg',
+          imageUrl: raw.imageUrl || '/images/ddn_hero_news.jpg',
+          imageCaption: raw.imageCaption,
+          readTime: raw.readTime || '3 मिनट',
+          views: typeof raw.views === 'number' ? raw.views : 100,
+          tags: Array.isArray(raw.tags) && raw.tags.length > 0 ? raw.tags : ['डीडीएन प्राइम न्यूज', raw.location || 'बिहार'],
+          isLead: Boolean(raw.isLead),
+          isBreaking: Boolean(raw.isBreaking),
+          status: raw.status || 'published',
+          slug: raw.slug || `news-${docSnap.id}`,
+        } as Article);
       });
       onUpdate(items);
     },
     (error) => {
-      console.warn('Realtime articles sync note:', error.message);
+      console.warn('Realtime articles sync note (non-fatal):', error?.message || error);
       onError?.(error);
-      handleFirestoreError(error, OperationType.LIST, 'articles');
     }
   );
 }

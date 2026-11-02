@@ -6,7 +6,7 @@ import {
   X, PlusCircle, Trash2, CheckCircle2, ShieldCheck, 
   PenTool, AlertCircle, FileCheck, LogIn, LogOut, 
   UserCheck, Users, ExternalLink, Printer, Sparkles, Loader2,
-  Flag, MapPin, Compass
+  Flag, MapPin, Compass, Eye
 } from 'lucide-react';
 import { 
   auth, signInWithGoogle, signOutUser, 
@@ -76,6 +76,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
   const [reporterApps, setReporterApps] = useState<ReporterApplication[]>([]);
   const [isLoadingReporters, setIsLoadingReporters] = useState(false);
   const [selectedReporterForCard, setSelectedReporterForCard] = useState<ReporterApplication | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; title: string; type: 'photo' | 'id' } | null>(null);
 
   // Form for new article
   const [title, setTitle] = useState('');
@@ -1032,24 +1033,30 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-100">
                             <div className="flex items-center gap-2">
                               {app.photoUrl && (
-                                <a 
-                                  href={app.photoUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                                <button 
+                                  type="button"
+                                  onClick={() => setPreviewMedia({
+                                    url: app.photoUrl!,
+                                    title: `${app.fullName} - पासपोर्ट फोटो`,
+                                    type: 'photo'
+                                  })}
+                                  className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded border border-blue-200 flex items-center gap-1 cursor-pointer"
                                 >
-                                  <ExternalLink className="w-3 h-3" /> फोटो देखें
-                                </a>
+                                  <Eye className="w-3.5 h-3.5 text-blue-600" /> फोटो देखें
+                                </button>
                               )}
                               {app.idDocumentUrl && (
-                                <a 
-                                  href={app.idDocumentUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="text-[11px] text-purple-600 hover:underline flex items-center gap-1"
+                                <button 
+                                  type="button"
+                                  onClick={() => setPreviewMedia({
+                                    url: app.idDocumentUrl!,
+                                    title: `${app.fullName} - पहचान पत्र (ID Proof)`,
+                                    type: 'id'
+                                  })}
+                                  className="text-[11px] text-purple-700 hover:text-purple-900 font-semibold bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded border border-purple-200 flex items-center gap-1 cursor-pointer"
                                 >
-                                  <ExternalLink className="w-3 h-3" /> पहचान पत्र (ID Proof) देखें
-                                </a>
+                                  <Eye className="w-3.5 h-3.5 text-purple-600" /> पहचान पत्र देखें
+                                </button>
                               )}
                             </div>
 
@@ -1111,6 +1118,59 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* In-Modal Photo / ID Proof Lightbox Viewer */}
+      {previewMedia && (
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-300 animate-in fade-in zoom-in-95 flex flex-col max-h-[85vh]">
+            <div className="bg-stone-900 text-white px-4 py-3 flex items-center justify-between">
+              <h4 className="font-bold text-xs sm:text-sm truncate">{previewMedia.title}</h4>
+              <button
+                type="button"
+                onClick={() => setPreviewMedia(null)}
+                className="p-1 rounded-full hover:bg-stone-800 text-stone-300 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-stone-100 flex items-center justify-center overflow-auto flex-grow min-h-[240px]">
+              {previewMedia.url.startsWith('data:application/pdf') || previewMedia.url.endsWith('.pdf') ? (
+                <iframe src={previewMedia.url} className="w-full h-80 rounded border border-stone-300" title={previewMedia.title} />
+              ) : (
+                <img
+                  src={previewMedia.url}
+                  alt={previewMedia.title}
+                  className="max-h-[55vh] max-w-full object-contain rounded-md shadow-sm border border-stone-200"
+                />
+              )}
+            </div>
+            <div className="p-3 bg-white border-t border-stone-200 flex items-center justify-between">
+              <span className="text-[11px] text-stone-500 font-medium">
+                {previewMedia.type === 'photo' ? 'पासपोर्ट साइज फोटो' : 'पहचान पत्र (आधार / वोटर आईडी)'}
+              </span>
+              <div className="flex items-center gap-2">
+                {previewMedia.url.startsWith('http') && (
+                  <a
+                    href={previewMedia.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded font-semibold flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> नई टैब में खोलें
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewMedia(null)}
+                  className="px-4 py-1 text-xs bg-stone-800 text-white font-bold rounded hover:bg-stone-900 cursor-pointer"
+                >
+                  बंद करें
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

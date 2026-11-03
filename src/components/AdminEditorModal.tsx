@@ -568,29 +568,59 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
     setIsCardModalOpen(true);
   };
 
-  // Filtered Reporter Applications
+  // Helper to safely handle any string / number / null property
+  const safeStr = (v: any): string => (v === null || v === undefined ? '' : String(v));
+
+  // Helper to validate image / photo URLs
+  const isSafePhotoUrl = (url?: any): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    return trimmed.startsWith('http://') || 
+           trimmed.startsWith('https://') || 
+           trimmed.startsWith('data:image/') || 
+           trimmed.startsWith('/images/') ||
+           (trimmed.length > 50 && !trimmed.includes(' '));
+  };
+
+  // Convert raw base64 or partial URLs into a valid browser image source
+  const getSafeMediaUrl = (url?: any): string => {
+    if (!url || typeof url !== 'string') return '/images/ddn_reporter_press.jpg';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/images/')) {
+      return trimmed;
+    }
+    if (trimmed.length > 50 && !trimmed.includes(' ')) {
+      return `data:image/jpeg;base64,${trimmed}`;
+    }
+    return '/images/ddn_reporter_press.jpg';
+  };
+
+  // Filtered Reporter Applications with defensive property access
   const filteredReporterApps = useMemo(() => {
-    let list = reporterApps;
+    let list = Array.isArray(reporterApps) ? reporterApps : [];
     if (reporterStatusFilter === 'verified') {
-      list = list.filter((r) => r.status === 'verified' || r.status === 'card_generated');
+      list = list.filter((r) => r && (r.status === 'verified' || r.status === 'card_generated'));
     } else if (reporterStatusFilter === 'pending') {
-      list = list.filter((r) => r.status === 'pending');
+      list = list.filter((r) => r && (r.status === 'pending' || !r.status));
     } else if (reporterStatusFilter === 'rejected') {
-      list = list.filter((r) => r.status === 'rejected');
+      list = list.filter((r) => r && r.status === 'rejected');
     }
 
     if (reporterAppSearch.trim()) {
       const q = reporterAppSearch.toLowerCase().trim();
-      list = list.filter((r) =>
-        (r.fullName || '').toLowerCase().includes(q) ||
-        (r.fatherName || '').toLowerCase().includes(q) ||
-        (r.mobile || '').toLowerCase().includes(q) ||
-        (r.email || '').toLowerCase().includes(q) ||
-        (r.district || '').toLowerCase().includes(q) ||
-        (r.block || '').toLowerCase().includes(q) ||
-        (r.beatPreference || '').toLowerCase().includes(q) ||
-        (r.id || '').toLowerCase().includes(q)
-      );
+      list = list.filter((r) => {
+        if (!r) return false;
+        return (
+          safeStr(r.fullName).toLowerCase().includes(q) ||
+          safeStr(r.fatherName).toLowerCase().includes(q) ||
+          safeStr(r.mobile).toLowerCase().includes(q) ||
+          safeStr(r.email).toLowerCase().includes(q) ||
+          safeStr(r.district).toLowerCase().includes(q) ||
+          safeStr(r.block).toLowerCase().includes(q) ||
+          safeStr(r.beatPreference).toLowerCase().includes(q) ||
+          safeStr(r.id).toLowerCase().includes(q)
+        );
+      });
     }
     return list;
   }, [reporterApps, reporterStatusFilter, reporterAppSearch]);
@@ -612,32 +642,39 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
 
   // Helper to distinguish Reporter Articles vs Admin Articles
   const isReporterArt = (a: Article): boolean => {
+    if (!a) return false;
     if (a.createdByRole === 'reporter') return true;
     if (a.createdByRole === 'admin') return false;
     if (a.reporterId || a.reporterName) return true;
-    if (a.authorRole?.includes('संवाददाता')) return true;
-    if (a.publishedAt?.includes('रिपोर्टर')) return true;
-    if (a.author?.includes('संजय') || a.author?.includes('अमित आनंद')) return true;
-    if (a.authorRole?.includes('संपादक') || a.author?.includes('राजेश') || a.author?.includes('मुख्य संपादक')) {
+    const role = safeStr(a.authorRole);
+    if (role.includes('संवाददाता')) return true;
+    const pub = safeStr(a.publishedAt);
+    if (pub.includes('रिपोर्टर')) return true;
+    const author = safeStr(a.author);
+    if (author.includes('संजय') || author.includes('अमित आनंद')) return true;
+    if (role.includes('संपादक') || author.includes('राजेश') || role.includes('मुख्य संपादक')) {
       return false;
     }
     return false;
   };
 
   const reporterArticles = useMemo(() => {
-    return articles.filter(isReporterArt);
+    return Array.isArray(articles) ? articles.filter(isReporterArt) : [];
   }, [articles]);
 
   const adminArticles = useMemo(() => {
-    return articles.filter((a) => !isReporterArt(a));
+    return Array.isArray(articles) ? articles.filter((a) => !isReporterArt(a)) : [];
   }, [articles]);
 
   // Distinct reporter names for 1-click filter chips
   const distinctReporters = useMemo(() => {
     const set = new Set<string>();
     reporterArticles.forEach((a) => {
-      if (a.author && a.author.trim()) set.add(a.author.trim());
-      if (a.reporterName && a.reporterName.trim()) set.add(a.reporterName.trim());
+      if (!a) return;
+      const aut = safeStr(a.author).trim();
+      const rep = safeStr(a.reporterName).trim();
+      if (aut) set.add(aut);
+      if (rep) set.add(rep);
     });
     return Array.from(set).filter(Boolean);
   }, [reporterArticles]);
@@ -647,19 +684,22 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
     let list = reporterArticles;
     if (selectedReporterFilter !== 'all') {
       list = list.filter(
-        (a) => a.author === selectedReporterFilter || a.reporterName === selectedReporterFilter
+        (a) => a && (a.author === selectedReporterFilter || a.reporterName === selectedReporterFilter)
       );
     }
     if (reporterSearchQuery.trim()) {
       const q = reporterSearchQuery.toLowerCase().trim();
-      list = list.filter((a) =>
-        (a.author || '').toLowerCase().includes(q) ||
-        (a.reporterName || '').toLowerCase().includes(q) ||
-        (a.title || '').toLowerCase().includes(q) ||
-        (a.location || '').toLowerCase().includes(q) ||
-        (a.summary || '').toLowerCase().includes(q) ||
-        (a.categoryHindi || '').toLowerCase().includes(q)
-      );
+      list = list.filter((a) => {
+        if (!a) return false;
+        return (
+          safeStr(a.author).toLowerCase().includes(q) ||
+          safeStr(a.reporterName).toLowerCase().includes(q) ||
+          safeStr(a.title).toLowerCase().includes(q) ||
+          safeStr(a.location).toLowerCase().includes(q) ||
+          safeStr(a.summary).toLowerCase().includes(q) ||
+          safeStr(a.categoryHindi).toLowerCase().includes(q)
+        );
+      });
     }
     return list;
   }, [reporterArticles, selectedReporterFilter, reporterSearchQuery]);
@@ -669,12 +709,15 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
     let list = adminArticles;
     if (adminSearchQuery.trim()) {
       const q = adminSearchQuery.toLowerCase().trim();
-      list = list.filter((a) =>
-        (a.title || '').toLowerCase().includes(q) ||
-        (a.location || '').toLowerCase().includes(q) ||
-        (a.summary || '').toLowerCase().includes(q) ||
-        (a.categoryHindi || '').toLowerCase().includes(q)
-      );
+      list = list.filter((a) => {
+        if (!a) return false;
+        return (
+          safeStr(a.title).toLowerCase().includes(q) ||
+          safeStr(a.location).toLowerCase().includes(q) ||
+          safeStr(a.summary).toLowerCase().includes(q) ||
+          safeStr(a.categoryHindi).toLowerCase().includes(q)
+        );
+      });
     }
     return list;
   }, [adminArticles, adminSearchQuery]);
@@ -1440,11 +1483,14 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                               <div className="flex items-start gap-3">
                                 {/* Photo or Avatar */}
                                 <div className="relative w-12 h-14 rounded-lg overflow-hidden border border-stone-300 bg-stone-100 shrink-0">
-                                  {app.photoUrl ? (
-                                    <img src={app.photoUrl} alt={app.fullName} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <img src="/images/ddn_reporter_press.jpg" alt="Default" className="w-full h-full object-cover" />
-                                  )}
+                                  <img 
+                                    src={getSafeMediaUrl(app.photoUrl)} 
+                                    alt={app.fullName || 'संवाददाता'} 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                                    }}
+                                  />
                                   {isVerified && (
                                     <div className="absolute top-0.5 right-0.5 bg-emerald-600 text-white p-0.5 rounded-full">
                                       <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -1490,8 +1536,8 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                                   <button 
                                     type="button"
                                     onClick={() => setPreviewMedia({
-                                      url: app.photoUrl!,
-                                      title: `${app.fullName} - पासपोर्ट फोटो`,
+                                      url: getSafeMediaUrl(app.photoUrl),
+                                      title: `${app.fullName || 'संवाददाता'} - पासपोर्ट फोटो`,
                                       type: 'photo'
                                     })}
                                     className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200 flex items-center gap-1 cursor-pointer"
@@ -1504,8 +1550,8 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                                   <button 
                                     type="button"
                                     onClick={() => setPreviewMedia({
-                                      url: app.idDocumentUrl!,
-                                      title: `${app.fullName} - पहचान पत्र (ID Proof)`,
+                                      url: getSafeMediaUrl(app.idDocumentUrl),
+                                      title: `${app.fullName || 'संवाददाता'} - पहचान पत्र (ID Proof)`,
                                       type: 'id'
                                     })}
                                     className="text-[11px] text-purple-700 hover:text-purple-900 font-semibold bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-200 flex items-center gap-1 cursor-pointer"
@@ -2211,7 +2257,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
         <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-300 animate-in fade-in zoom-in-95 flex flex-col max-h-[85vh]">
             <div className="bg-stone-900 text-white px-4 py-3 flex items-center justify-between">
-              <h4 className="font-bold text-xs sm:text-sm truncate">{previewMedia.title}</h4>
+              <h4 className="font-bold text-xs sm:text-sm truncate">{previewMedia.title || 'दस्तावेज पूर्वावलोकन'}</h4>
               <button
                 type="button"
                 onClick={() => setPreviewMedia(null)}
@@ -2221,13 +2267,16 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
               </button>
             </div>
             <div className="p-4 bg-stone-100 flex items-center justify-center overflow-auto flex-grow min-h-[240px]">
-              {previewMedia.url.startsWith('data:application/pdf') || previewMedia.url.endsWith('.pdf') ? (
-                <iframe src={previewMedia.url} className="w-full h-80 rounded border border-stone-300" title={previewMedia.title} />
+              {previewMedia.url && (previewMedia.url.startsWith('data:application/pdf') || previewMedia.url.endsWith('.pdf')) ? (
+                <iframe src={previewMedia.url} className="w-full h-80 rounded border border-stone-300" title={previewMedia.title || 'PDF Preview'} />
               ) : (
                 <img
-                  src={previewMedia.url}
-                  alt={previewMedia.title}
+                  src={getSafeMediaUrl(previewMedia.url)}
+                  alt={previewMedia.title || 'Preview'}
                   className="max-h-[55vh] max-w-full object-contain rounded-md shadow-sm border border-stone-200"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                  }}
                 />
               )}
             </div>
@@ -2236,7 +2285,7 @@ export const AdminEditorModal: React.FC<AdminEditorModalProps> = ({
                 {previewMedia.type === 'photo' ? 'पासपोर्ट साइज फोटो' : 'पहचान पत्र (आधार / वोटर आईडी)'}
               </span>
               <div className="flex items-center gap-2">
-                {previewMedia.url.startsWith('http') && (
+                {previewMedia.url && previewMedia.url.startsWith('http') && (
                   <a
                     href={previewMedia.url}
                     target="_blank"

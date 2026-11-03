@@ -48,17 +48,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="hi" className="scroll-smooth">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;500;600;700;800&family=Rozha+One&family=Yatra+One&display=swap"
-          rel="stylesheet"
-        />
+      <body className="min-h-screen bg-stone-50 text-stone-900 antialiased selection:bg-red-700 selection:text-white">
         <OrganizationSchema />
         <WebsiteSearchSchema />
-      </head>
-      <body className="min-h-screen bg-stone-50 text-stone-900 antialiased selection:bg-red-700 selection:text-white">
         {children}
       </body>
     </html>

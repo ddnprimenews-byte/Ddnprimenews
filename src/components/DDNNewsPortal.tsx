@@ -1101,16 +1101,18 @@ export default function App({
         bulletins={VIDEO_BULLETINS}
       />
 
-      <AdminEditorModal
-        isOpen={isAdminDeskOpen}
-        onClose={() => setIsAdminDeskOpen(false)}
-        onAddArticle={handleAddArticle}
-        onUpdateArticle={handleUpdateArticle}
-        onAddBreakingNews={handleAddBreaking}
-        articles={articles}
-        onDeleteArticle={handleDeleteArticle}
-        onSelectArticle={handleSelectArticle}
-      />
+      {isAdminDeskOpen && (
+        <AdminEditorModal
+          isOpen={isAdminDeskOpen}
+          onClose={() => setIsAdminDeskOpen(false)}
+          onAddArticle={handleAddArticle}
+          onUpdateArticle={handleUpdateArticle}
+          onAddBreakingNews={handleAddBreaking}
+          articles={articles}
+          onDeleteArticle={handleDeleteArticle}
+          onSelectArticle={handleSelectArticle}
+        />
+      )}
     </div>
   );
 }

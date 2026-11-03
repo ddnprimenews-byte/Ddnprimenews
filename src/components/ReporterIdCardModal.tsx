@@ -26,8 +26,23 @@ export const ReporterIdCardModal: React.FC<ReporterIdCardModalProps> = ({
 
   if (!isOpen || !reporter) return null;
 
-  const pressId = `DDN-PRESS-${reporter.id.replace('app-', '').toUpperCase().padStart(4, '0')}`;
-  const verifyUrl = `https://ddnprimenews.com/verify-reporter?id=${encodeURIComponent(reporter.id)}&name=${encodeURIComponent(reporter.fullName)}`;
+  const getSafePhotoUrl = (url?: any): string => {
+    if (!url || typeof url !== 'string') return '/images/ddn_reporter_press.jpg';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/images/')) {
+      return trimmed;
+    }
+    if (trimmed.length > 50 && !trimmed.includes(' ')) {
+      return `data:image/jpeg;base64,${trimmed}`;
+    }
+    return '/images/ddn_reporter_press.jpg';
+  };
+
+  const safePhoto = getSafePhotoUrl(reporter.photoUrl);
+  const repId = String(reporter.id || 'DDN-REP-0001');
+  const repName = String(reporter.fullName || 'अधिकृत संवाददाता');
+  const pressId = `DDN-PRESS-${repId.replace('app-', '').toUpperCase().padStart(4, '0')}`;
+  const verifyUrl = `https://ddnprimenews.com/verify-reporter?id=${encodeURIComponent(repId)}&name=${encodeURIComponent(repName)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}&color=0b192c&bgcolor=ffffff&qzone=1`;
 
   const issueDate = reporter.appliedDate || new Date().toLocaleDateString('hi-IN');
@@ -286,17 +301,11 @@ export const ReporterIdCardModal: React.FC<ReporterIdCardModalProps> = ({
                       <div className="px-4 py-2 flex flex-col items-center text-center">
                         {/* Candidate Photo */}
                         <div className="relative w-24 h-28 rounded-xl overflow-hidden border-2 border-red-700 shadow-md bg-stone-100 mb-2">
-                          {reporter.photoUrl ? (
-                            <img
-                              src={reporter.photoUrl}
-                              alt={reporter.fullName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 bg-stone-100 text-xs">
-                              <img src="/images/ddn_reporter_press.jpg" alt="Default" className="w-full h-full object-cover" />
-                            </div>
-                          )}
+                          <img
+                            src={safePhoto}
+                            alt={repName}
+                            className="w-full h-full object-cover"
+                          />
                           <div className="absolute bottom-0 inset-x-0 bg-red-800/90 text-white text-[7.5px] font-bold py-0.5 font-mono">
                             {pressId}
                           </div>
@@ -486,8 +495,8 @@ export const ReporterIdCardModal: React.FC<ReporterIdCardModalProps> = ({
                         {/* Candidate Photo */}
                         <div className="w-24 h-28 rounded-xl overflow-hidden border-2 border-red-700 shadow-md bg-stone-100 shrink-0 relative">
                           <img
-                            src={reporter.photoUrl || '/images/ddn_reporter_press.jpg'}
-                            alt={reporter.fullName}
+                            src={safePhoto}
+                            alt={repName}
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute bottom-0 inset-x-0 bg-red-800/90 text-white text-[7px] font-bold py-0.5 text-center font-mono">
@@ -680,8 +689,8 @@ export const ReporterIdCardModal: React.FC<ReporterIdCardModalProps> = ({
 
                   <div className="w-20 h-24 rounded-lg overflow-hidden border border-stone-300 shrink-0 bg-stone-100 shadow-xs">
                     <img
-                      src={reporter.photoUrl || '/images/ddn_reporter_press.jpg'}
-                      alt={reporter.fullName}
+                      src={safePhoto}
+                      alt={repName}
                       className="w-full h-full object-cover"
                     />
                   </div>

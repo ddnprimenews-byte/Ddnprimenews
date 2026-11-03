@@ -116,6 +116,15 @@ export function subscribeToArticles(
           isBreaking: Boolean(raw.isBreaking),
           status: raw.status || 'published',
           slug: raw.slug || `news-${docSnap.id}`,
+          createdByRole: raw.createdByRole || (raw.reporterId || raw.reporterName ? 'reporter' : 'admin'),
+          reporterId: raw.reporterId,
+          reporterName: raw.reporterName,
+          aeoSummary: raw.aeoSummary,
+          sections: Array.isArray(raw.sections) ? raw.sections : undefined,
+          faqs: Array.isArray(raw.faqs) ? raw.faqs : undefined,
+          videoUrl: raw.videoUrl,
+          youtubeId: raw.youtubeId,
+          trendingRank: typeof raw.trendingRank === 'number' ? raw.trendingRank : undefined,
         } as Article);
       });
       onUpdate(items);
@@ -156,8 +165,14 @@ export function subscribeToBreakingNews(
 export async function saveArticleToFirestore(article: Article): Promise<void> {
   const docRef = doc(db, 'articles', article.id);
   try {
+    const cleanData: Record<string, any> = {};
+    Object.entries(article).forEach(([k, v]) => {
+      if (v !== undefined) {
+        cleanData[k] = v;
+      }
+    });
     await setDoc(docRef, {
-      ...article,
+      ...cleanData,
       updatedAt: serverTimestamp(),
     });
     console.log(`Article ${article.id} confirmed saved to Firestore.`);

@@ -118,9 +118,20 @@ function ReporterVerificationContent() {
               <div className="flex items-center gap-4 border-b border-stone-100 pb-4">
                 <div className="w-20 h-24 rounded-xl overflow-hidden border-2 border-red-700 shadow-xs bg-stone-100 shrink-0">
                   <img
-                    src={reporterData?.photoUrl || '/images/ddn_reporter_press.jpg'}
+                    src={
+                      reporterData?.photoUrl?.startsWith('data:') ||
+                      reporterData?.photoUrl?.startsWith('http') ||
+                      reporterData?.photoUrl?.startsWith('/images/')
+                        ? reporterData.photoUrl
+                        : reporterData?.photoUrl && reporterData.photoUrl.length > 50
+                        ? `data:image/jpeg;base64,${reporterData.photoUrl}`
+                        : '/images/ddn_reporter_press.jpg'
+                    }
                     alt={reporterData?.fullName || 'संवाददाता'}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/images/ddn_reporter_press.jpg';
+                    }}
                   />
                 </div>
                 <div>

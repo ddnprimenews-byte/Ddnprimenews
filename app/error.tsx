@@ -9,15 +9,21 @@ interface ErrorProps {
   reset: () => void;
 }
 
-/**
- * Production-Grade Global Error Boundary for DDN Prime News
- * Prevents portal crashes by presenting a graceful Hindi/English recovery interface
- */
 export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // Log the error to reporting service in production
     console.error('DDN Prime News Portal Error Caught:', error);
   }, [error]);
+
+  const handleCleanReset = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ddn_custom_articles');
+        localStorage.removeItem('ddn_admin_session');
+        localStorage.removeItem('ddn_reporter_session');
+      } catch (e) {}
+      window.location.href = '/';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
@@ -42,10 +48,15 @@ export default function Error({ error, reset }: ErrorProps) {
             <div>
               <p className="font-semibold">पृष्ठ लोड करते समय अप्रत्याशित त्रुटि उत्पन्न हुई।</p>
               <p className="text-stone-600 mt-1 text-xs">
-                चिंता न करें, हमारा तकनीकी डेस्क इस समस्या पर नजर बनाए हुए है। कृपया पुनः प्रयास करें।
+                चिंता न करें, हमारा तकनीकी डेस्क इस समस्या पर नजर बनाए हुए है। कृपया नीचे दिए बटन से पोर्टल पुनः लोड करें।
               </p>
-              {error.digest && (
-                <p className="mt-2 text-[10px] font-mono text-stone-400">
+              {error?.message && (
+                <p className="mt-2 text-[10px] font-mono text-red-800 bg-red-50 p-2 rounded border border-red-200 break-words">
+                  त्रुटि: {error.message}
+                </p>
+              )}
+              {error?.digest && (
+                <p className="mt-1 text-[10px] font-mono text-stone-400">
                   त्रुटि संदर्भ कोड: {error.digest}
                 </p>
               )}
@@ -55,34 +66,27 @@ export default function Error({ error, reset }: ErrorProps) {
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
             <button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  try {
-                    localStorage.removeItem('ddn_custom_articles');
-                  } catch (e) {}
-                }
-                reset();
-              }}
+              type="button"
+              onClick={handleCleanReset}
               className="w-full sm:w-1/2 py-2.5 px-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition flex items-center justify-center gap-1.5 text-xs sm:text-sm shadow-sm cursor-pointer active:scale-95"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>पुनः प्रयास करें (Retry)</span>
+              <span>डेटा साफ़ कर पुनः लोड करें</span>
             </button>
 
-            <a
-              href="/"
+            <button
+              type="button"
               onClick={() => {
-                if (typeof window !== 'undefined') {
-                  try {
-                    localStorage.removeItem('ddn_custom_articles');
-                  } catch (e) {}
-                }
+                try {
+                  localStorage.removeItem('ddn_custom_articles');
+                } catch (e) {}
+                reset();
               }}
               className="w-full sm:w-1/2 py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg transition border border-stone-300 flex items-center justify-center gap-1.5 text-xs sm:text-sm cursor-pointer active:scale-95"
             >
               <Home className="w-4 h-4" />
-              <span>होमपेज लोड करें</span>
-            </a>
+              <span>पुनः प्रयास करें</span>
+            </button>
           </div>
 
           {/* Emergency Editorial Helpline */}
